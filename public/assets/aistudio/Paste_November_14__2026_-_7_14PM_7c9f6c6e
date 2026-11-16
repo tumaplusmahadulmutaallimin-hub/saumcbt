@@ -1,0 +1,1355 @@
+# FINAL MASTER PROMPT
+# SAUM — SISTEM ADMINISTRASI UJIAN MADRASAH
+
+**Platform Administrasi Ujian Terintegrasi, Otomatis, dan Siap Cetak**
+
+## A. IDENTITAS DAN TUJUAN PENGEMBANGAN
+
+Saya ingin menyempurnakan dan meng-upgrade aplikasi SAUM (Sistem Administrasi Ujian Madrasah) menjadi aplikasi administrasi ujian yang profesional, terintegrasi, modern, dan mudah digunakan oleh panitia madrasah.
+
+Aplikasi ini digunakan untuk mengelola seluruh kegiatan administrasi ujian, mulai dari persiapan peserta, pengaturan moda ujian, pembagian nomor peserta, sesi, ruang, denah lokasi, denah tempat duduk, daftar hadir, jadwal, pengawas, dokumen ujian, administrasi penitipan HP santri, hingga arsip ujian.
+
+Tujuan utama:
+1. Meminimalkan pekerjaan administrasi manual.
+2. Menghindari kesalahan pembagian peserta.
+3. Menghasilkan dokumen ujian secara otomatis.
+4. Mengintegrasikan seluruh data ujian dalam satu sistem.
+5. Mempermudah panitia dalam melakukan pengaturan dan pencetakan.
+6. Menjamin data peserta, ruang, sesi, jadwal, dan dokumen selalu konsisten.
+
+**PRINSIP UTAMA: SATU KALI INPUT, DATA TERINTEGRASI KE SELURUH MODUL, TANPA INPUT ULANG.**
+
+---
+
+# B. INSTRUKSI WAJIB: UPGRADE APLIKASI EXISTING
+
+Aplikasi SAUM sudah memiliki proyek dan struktur existing. Karena itu, lakukan pengembangan pada aplikasi yang sudah tersedia.
+
+JANGAN:
+- Membangun ulang aplikasi dari nol.
+- Menghapus database lama.
+- Menghapus data yang sudah tersimpan.
+- Mengganti framework tanpa alasan teknis yang kuat.
+- Mengubah desain atau modul yang tidak berkaitan dengan pengembangan.
+- Membuat sistem baru yang menduplikasi fitur existing.
+- Mengubah autentikasi dan hak akses tanpa kebutuhan.
+- Mengganti API existing secara sembarangan.
+- Membuat tombol, menu, dan fitur yang hanya menjadi pajangan.
+
+WAJIB:
+1. Audit struktur proyek sebelum mengubah kode.
+2. Identifikasi frontend, backend, database, API, dan sistem autentikasi.
+3. Periksa tabel database dan relasinya.
+4. Gunakan kembali komponen, API, dan fungsi yang masih relevan.
+5. Buat backup sebelum perubahan database.
+6. Terapkan perubahan secara modular.
+7. Pertahankan kompatibilitas dengan data lama.
+8. Pastikan semua fitur terhubung dengan backend dan database.
+9. Lakukan pengujian setiap modul sebelum melanjutkan ke modul berikutnya.
+10. Pastikan data tetap tersimpan setelah halaman di-refresh, logout, dan login kembali.
+
+Sebelum implementasi, buat laporan singkat hasil audit dan rencana perubahan. Setelah itu, kerjakan pengembangan secara bertahap tanpa merusak aplikasi existing.
+
+---
+
+# C. DESAIN UI/UX APLIKASI
+
+Gunakan desain modern, minimalis, elegan, profesional, dan responsif.
+
+Karakter desain:
+- Sidebar sederhana.
+- Ikon mudah dikenali.
+- Nama menu singkat.
+- Tidak banyak deskripsi pada ikon.
+- Warna konsisten.
+- Tabel rapi dan mudah dibaca.
+- Formulir tidak terlalu panjang.
+- Modal untuk pengaturan.
+- Tombol aksi jelas.
+- Tampilan nyaman di desktop, tablet, dan HP.
+
+Jangan membuat tampilan terlalu ramai atau penuh tulisan.
+
+## Struktur Menu Utama
+
+1. Dashboard
+2. Pengaturan Ujian
+3. Data DNPU
+4. Nomor Peserta
+5. Pembagian Ruang & Sesi
+6. Denah Lokasi
+7. Denah Tempat Duduk
+8. Daftar Hadir
+9. Label Ruang
+10. Jadwal Ujian
+11. Pengawas
+12. Dokumen Ujian
+13. Administrasi HP
+14. Pusat Cetak
+15. Arsip Ujian
+16. Pengaturan
+
+Gunakan ikon yang sesuai dengan fungsi setiap menu.
+
+## Dashboard
+
+Tampilkan informasi:
+- Nama ujian.
+- Tahun pelajaran.
+- Moda ujian.
+- Jumlah peserta.
+- Jumlah jenjang.
+- Jumlah ruang.
+- Jumlah sesi.
+- Jumlah hari ujian.
+- Jumlah mata pelajaran.
+- Jumlah pengawas.
+- Progres administrasi.
+- Status dokumen.
+- Ringkasan persiapan ujian.
+
+Gunakan kartu statistik sederhana dan visualisasi progres yang tidak berlebihan.
+
+---
+
+# D. PENGATURAN UJIAN
+
+Sebelum mengunggah DNPU, admin harus membuat konfigurasi kegiatan ujian.
+
+Data konfigurasi:
+- Nama ujian.
+- Tahun pelajaran.
+- Jenjang.
+- Tanggal mulai.
+- Tanggal selesai.
+- Jumlah hari.
+- Jumlah mata pelajaran.
+- Moda ujian.
+- Jumlah ruang.
+- Jumlah sesi jika online.
+- Jam pelaksanaan.
+- Identitas madrasah.
+- KOP madrasah.
+- Nama kepala madrasah.
+- Nama ketua panitia.
+- Format dokumen.
+
+## Pilihan Moda Ujian
+
+### 1. ONLINE
+
+Jika memilih moda online:
+- Admin menentukan jumlah sesi.
+- Admin menentukan jumlah ruang.
+- Sistem melakukan pembagian peserta berdasarkan sesi dan ruang.
+- Sistem menyediakan nomor peserta.
+- Sistem menyediakan denah lokasi.
+- Sistem menyediakan denah tempat duduk.
+- Sistem menyediakan daftar hadir.
+- Sistem menyediakan penugasan pengawas.
+- Sistem mengaktifkan administrasi HP santri.
+
+### 2. TEKS/KERTAS
+
+Jika memilih moda teks/kertas:
+- Tidak perlu pengaturan sesi, kecuali memang digunakan.
+- Admin menentukan jumlah ruang.
+- Sistem melakukan pembagian peserta.
+- Sistem menyediakan nomor peserta.
+- Sistem menyediakan denah lokasi.
+- Sistem menyediakan denah tempat duduk.
+- Sistem menyediakan daftar hadir.
+- Sistem menyediakan penugasan pengawas.
+- Sistem menyediakan dokumen segel soal dan lembar jawaban.
+
+Seluruh menu dan dokumen harus menyesuaikan moda ujian yang dipilih.
+
+---
+
+# E. UPLOAD DAN PENGELOLAAN DNPU
+
+## 1. Upload DNPU
+
+Admin mengunggah file Daftar Nominasi Peserta Ujian.
+
+Format yang didukung:
+- Excel XLSX.
+- Excel XLS.
+- CSV sebagai alternatif.
+
+Struktur kolom:
+
+| NISN | NIS | NAMA | JK | KELAS |
+|---|---|---|---|---|
+| 0110000001 | 2601001 | Ahmad | L | X-A |
+| 0110000002 | 2601002 | Fatimah | P | X-A |
+
+Ketentuan:
+- Format data horizontal.
+- Setiap atribut menjadi kolom.
+- Setiap peserta menjadi satu baris.
+- NISN dan NIS harus dibaca sebagai teks agar angka nol di depan tidak hilang.
+- Tersedia template Excel.
+- Tersedia preview sebelum impor.
+- Sistem dapat memetakan header yang berbeda.
+- Sistem mendeteksi data ganda.
+- Sistem mendeteksi NISN kosong.
+- Sistem mendeteksi NIS kosong.
+- Sistem mendeteksi kelas yang tidak terdaftar.
+- Tampilkan data valid dan tidak valid.
+- Tampilkan nomor baris yang mengalami kesalahan.
+- Admin dapat memperbaiki data sebelum menyimpan.
+
+## 2. Tabel Data Peserta
+
+Tampilkan:
+
+| No | NISN | NIS | Nama | JK | Kelas | Nomor Peserta | Sesi | Ruang |
+|---|---|---|---|---|---|---|---|---|
+
+Kolom sesi hanya muncul pada moda online atau ketika sesi digunakan.
+
+Sediakan:
+- Pencarian nama.
+- Filter kelas.
+- Filter jenjang.
+- Filter ruang.
+- Filter sesi.
+- Edit data.
+- Hapus data dengan konfirmasi.
+- Impor ulang dengan validasi.
+- Ekspor Excel.
+
+## 3. Generate Nomor Peserta
+
+Admin menentukan:
+- Kode nomor peserta setiap kelas/jenjang.
+- Nomor awal.
+- Jumlah digit.
+- Format nomor.
+- Pola penomoran.
+
+Sistem menghasilkan nomor peserta secara otomatis.
+
+Aturan:
+1. Nomor mengikuti urutan kelas dan kode kelas yang telah ditetapkan.
+2. Nomor peserta tidak boleh acak.
+3. Setiap peserta memiliki nomor unik.
+4. Nomor peserta mengikuti format resmi ujian.
+5. Sistem tidak boleh mengganti nomor yang sudah difinalisasi tanpa konfirmasi.
+6. Generate ulang harus memiliki preview dan konfirmasi.
+7. Simpan riwayat perubahan nomor peserta.
+
+Contoh format nomor peserta harus dapat diatur admin, bukan dikunci dalam kode program.
+
+## 4. Generate Sesi — Khusus Online
+
+Admin menentukan jumlah sesi yang digunakan.
+
+Sistem membagi peserta secara otomatis dan acak dengan distribusi seimbang.
+
+Aturan:
+- Semua peserta mendapatkan sesi.
+- Tidak ada peserta yang mendapatkan dua sesi.
+- Jumlah peserta antarsesi diusahakan seimbang.
+- Sesi dapat diatur ulang sebelum finalisasi.
+- Admin dapat melakukan koreksi manual.
+- Perubahan harus divalidasi.
+
+## 5. Generate Ruang
+
+Admin menentukan jumlah ruang ujian.
+
+Kapasitas maksimal ideal adalah 22 peserta dalam satu ruang.
+
+Komposisi ideal:
+- 11 peserta dari satu jenjang.
+- 11 peserta dari jenjang berbeda.
+
+Tujuannya agar peserta dari jenjang berbeda duduk berdampingan sesuai pola pengawasan.
+
+Aturan pembagian:
+1. Pembagian ruang dilakukan secara acak.
+2. Komposisi jenjang diusahakan seimbang.
+3. Kapasitas maksimal 22 peserta per ruang.
+4. Jika komposisi tidak memungkinkan, jumlah dapat menjadi 21, 20, atau sesuai jumlah peserta yang tersedia.
+5. Sistem tidak boleh memaksakan komposisi yang tidak mungkin.
+6. Tidak boleh ada peserta yang hilang.
+7. Tidak boleh ada peserta yang masuk dua ruang.
+8. Admin dapat mengubah penempatan sebelum finalisasi.
+9. Sistem menampilkan komposisi peserta per ruang.
+10. Sistem memberikan peringatan jika kapasitas atau komposisi tidak sesuai.
+
+Untuk moda online, pembagian ruang harus konsisten dengan pembagian sesi.
+
+## 6. Finalisasi DNPU
+
+Sediakan:
+- Preview.
+- Validasi.
+- Generate ulang.
+- Edit manual.
+- Finalisasi.
+- Cetak.
+- Ekspor Excel.
+
+Setelah finalisasi, data menjadi sumber resmi seluruh dokumen ujian.
+
+---
+
+# F. MODUL DENAH LOKASI
+
+## 1. Fungsi Utama
+
+Denah Lokasi digunakan untuk menentukan kelas fisik mana yang dijadikan ruang ujian.
+
+Denah bukan hanya dokumen cetak, tetapi merupakan halaman pengaturan interaktif.
+
+Alur:
+
+**Admin membuka Denah Lokasi → Melihat seluruh kelas → Mengeklik kotak kelas → Memilih nomor ruang → Menyimpan → Sistem mengubah warna kelas → Finalisasi → Cetak.**
+
+## 2. Layout Fisik Madrasah
+
+Gunakan gambar layout madrasah yang telah diberikan sebagai referensi utama.
+
+Susunan fisik berdasarkan gambar:
+
+- Ruang Guru berada di kanan atas.
+- Kelas X-B berada di sisi kiri/barat.
+- Jalan berada di sebelah kanan Kelas X-B.
+- Di sebelah timur jalan terdapat enam ruang kelas.
+- Susunan enam ruang kelas adalah tiga kolom dan dua baris.
+
+Posisi ruang:
+
+| Baris | Kolom 1 | Kolom 2 | Kolom 3 |
+|---|---|---|---|
+| Atas | Kelas X-B | Kelas X-A | Kelas XII-A |
+| Bawah | Kelas XI-A | Kelas XII-C | Kelas XII-B |
+
+Pertahankan:
+- Posisi kelas.
+- Posisi ruang guru.
+- Posisi jalan.
+- Arah mata angin.
+- Jarak dan susunan relatif bangunan.
+
+Jangan mengacak posisi bangunan berdasarkan nomor ruang.
+
+## 3. Tampilan Pengaturan
+
+Tampilkan seluruh kelas dalam bentuk kotak yang dapat diklik.
+
+Warna status:
+- Hijau: digunakan sebagai ruang ujian.
+- Abu-abu: tidak digunakan.
+- Outline khusus: sedang dipilih.
+
+Seluruh kelas harus selalu terlihat, termasuk kelas yang tidak digunakan.
+
+Tambahkan legenda warna yang sederhana.
+
+## 4. Interaksi Penetapan Ruang
+
+Ketika admin mengeklik salah satu kotak kelas, tampilkan modal:
+
+**PENETAPAN RUANG UJIAN**
+
+Kelas: KELAS X-A
+
+Nomor Ruang:
+[ RUANG 01 ]
+
+Tombol:
+- Simpan.
+- Batal.
+
+Setelah disimpan, kotak kelas menampilkan:
+
+KELAS X-A
+RUANG 01
+
+Jika belum digunakan, kotak hanya menampilkan:
+
+KELAS XII-A
+
+Admin dapat:
+- Menetapkan nomor ruang.
+- Mengubah nomor ruang.
+- Membatalkan penetapan.
+- Menyimpan draft.
+- Melihat kelas yang sudah digunakan.
+- Melihat kelas yang belum digunakan.
+- Melakukan finalisasi.
+
+## 5. Aturan Penetapan
+
+1. Satu kelas fisik hanya memiliki satu penetapan ruang aktif dalam satu kegiatan ujian.
+2. Nomor ruang tidak boleh digunakan oleh dua lokasi fisik berbeda, kecuali admin secara eksplisit membuat satu ruang ujian yang menggunakan beberapa lokasi fisik.
+3. Penetapan harus terkait dengan kegiatan ujian aktif.
+4. Admin dapat mengubah penetapan sebelum finalisasi.
+5. Perubahan setelah finalisasi harus meminta konfirmasi.
+6. Semua perubahan disimpan dalam riwayat.
+7. Kelas yang tidak digunakan tetap ditampilkan.
+8. Sistem harus membedakan nomor ruang ujian dan nama kelas fisik.
+
+## 6. Integrasi dengan DNPU
+
+Hubungkan penetapan ruang fisik dengan pembagian ruang peserta.
+
+Sistem harus dapat menampilkan:
+- Nomor ruang ujian.
+- Nama kelas fisik.
+- Daftar peserta.
+- Jumlah peserta.
+- Komposisi jenjang.
+- Sesi jika online.
+- Pengawas.
+
+Jika satu kelompok ruang ujian menggunakan lebih dari satu kelas fisik, dukung pemetaan beberapa lokasi fisik ke satu nomor ruang ujian.
+
+Jika satu kelas fisik digunakan untuk beberapa sesi berbeda, pemetaan harus dibedakan berdasarkan sesi.
+
+Jangan menganggap nama kelas fisik otomatis sama dengan nomor ruang ujian.
+
+## 7. Finalisasi dan Cetak
+
+Setelah penetapan selesai, tampilkan semua kelas dengan perbedaan warna.
+
+Contoh:
+- KELAS X-B — RUANG 01.
+- KELAS X-A — RUANG 02.
+- KELAS XII-A — belum digunakan.
+- KELAS XI-A — RUANG 03.
+- KELAS XII-C — belum digunakan.
+- KELAS XII-B — RUANG 04.
+
+Nomor tersebut hanya contoh. Gunakan data yang ditetapkan admin.
+
+Fitur:
+- Preview.
+- Simpan Draft.
+- Finalisasi.
+- Cetak.
+- Download PDF.
+
+Hasil cetak menampilkan:
+- Seluruh layout madrasah.
+- Nama seluruh kelas.
+- Nomor ruang pada kelas yang digunakan.
+- Perbedaan warna kelas.
+- Ruang Guru.
+- Jalan.
+- Arah mata angin.
+- KOP madrasah.
+
+Format:
+- A4 atau F4.
+- Landscape sebagai orientasi utama.
+- Margin dapat disesuaikan.
+- Preview harus sama dengan hasil cetak.
+
+Jangan menambahkan deskripsi panjang dalam kotak kelas.
+
+---
+
+# G. MODUL DENAH TEMPAT DUDUK PESERTA
+
+Modul ini berbeda dengan Denah Lokasi.
+
+Denah Lokasi menunjukkan posisi ruang ujian di lingkungan madrasah.
+
+Denah Tempat Duduk menunjukkan posisi setiap peserta di dalam satu ruang ujian.
+
+Gunakan gambar denah tempat duduk yang telah diberikan sebagai referensi desain.
+
+## 1. Susunan Meja
+
+Gunakan susunan dari kiri ke kanan:
+
+**MEJA 1 | MEJA 2 | GANG | MEJA 3 | MEJA 4 | GANG | MEJA 5 | MEJA 6**
+
+Ketentuan:
+- Satu baris memiliki enam kotak peserta.
+- Meja 1 dan 2 merupakan kelompok pertama.
+- Meja 3 dan 4 merupakan kelompok kedua.
+- Meja 5 dan 6 merupakan kelompok ketiga.
+- Dua celah kosong menjadi pemisah antarkelompok.
+- Tidak perlu menampilkan tulisan GANG.
+- Tidak perlu ikon jalan.
+- Tidak perlu deskripsi pada area kosong.
+
+Secara visual, gunakan ruang kosong sebagai pemisah antarblok meja.
+
+## 2. Format Portrait
+
+Denah harus menggunakan orientasi portrait.
+
+Barisan berikutnya berada di bawah barisan sebelumnya.
+
+Jumlah baris menyesuaikan jumlah peserta dalam ruang tersebut.
+
+Maksimal 22 peserta per ruang.
+
+Contoh pembagian 22 peserta:
+- Baris 1: 6 peserta.
+- Baris 2: 6 peserta.
+- Baris 3: 6 peserta.
+- Baris 4: 4 peserta.
+
+Untuk 21 peserta:
+- Baris 1: 6 peserta.
+- Baris 2: 6 peserta.
+- Baris 3: 6 peserta.
+- Baris 4: 3 peserta.
+
+Jangan menampilkan kotak kosong untuk memenuhi kapasitas.
+
+## 3. Komposisi Peserta
+
+Usahakan peserta dari jenjang berbeda duduk berdampingan.
+
+Contoh:
+- Peserta kelas X berdampingan dengan kelas XII.
+- Peserta kelas XI berdampingan dengan kelas X.
+
+Gunakan hasil pembagian peserta dari DNPU.
+
+Jangan melakukan pengacakan baru ketika generate denah.
+
+## 4. Isi Kotak Peserta
+
+Setiap kotak menampilkan:
+
+1. Nomor peserta.
+2. Nama kelas.
+3. Nama lengkap.
+
+Tata letak:
+- Nomor peserta di bagian atas.
+- Kelas di bagian tengah.
+- Nama di bagian bawah.
+
+Nama panjang boleh turun ke baris berikutnya.
+
+Pastikan tulisan tidak terpotong atau keluar dari kotak.
+
+## 5. Header Denah
+
+Tampilkan:
+- KOP madrasah.
+- Judul DENAH TEMPAT DUDUK PESERTA.
+- Nama ujian.
+- Tahun pelajaran.
+- Nomor ruang.
+- Rentang nomor peserta setiap kelas.
+- Kotak PENGAWAS.
+- Susunan meja dan peserta.
+- Area tanda tangan.
+
+## 6. Rentang Nomor Peserta
+
+Tampilkan rentang nomor peserta berdasarkan kelas yang berada di ruang tersebut.
+
+Jika nomor peserta tidak berurutan, tampilkan rentang secara terpisah.
+
+Jangan membuat rentang berdasarkan asumsi.
+
+## 7. Output
+
+- Satu ruang satu halaman.
+- Portrait.
+- A4/F4.
+- Kotak peserta proporsional.
+- Tidak terpotong.
+- Ukuran font terbaca.
+- Preview dan PDF harus sama.
+
+---
+
+# H. MODUL DAFTAR HADIR PESERTA
+
+Setiap ruang memiliki daftar hadir sendiri.
+
+Alur:
+1. Admin membuka Daftar Hadir.
+2. Memilih kegiatan ujian.
+3. Memilih tanggal.
+4. Memilih mata pelajaran.
+5. Memilih ruang.
+6. Memilih sesi jika online.
+7. Sistem menampilkan daftar peserta.
+8. Admin melakukan preview dan mencetak.
+
+## Urutan Nama
+
+Urutan:
+1. Kelas atau jenjang terkecil terlebih dahulu.
+2. Dalam setiap kelas, nama diurutkan alfabetis A–Z.
+
+## Format Tabel
+
+| No | Nomor Peserta | NISN | Nama | JK | Kelas | Tanda Tangan | Keterangan |
+|---|---|---|---|---|---|---|---|
+
+Sediakan:
+- Cetak per ruang.
+- Cetak per hari.
+- Cetak per mata pelajaran.
+- Cetak massal.
+- Download PDF.
+
+Data wajib mengikuti DNPU yang telah difinalisasi.
+
+---
+
+# I. MODUL LABEL RUANG
+
+Buat dokumen label identitas ruang untuk ditempel di depan ruang ujian.
+
+Contoh:
+
+**RUANG 01**
+
+KELAS X : 001–010
+
+KELAS XI : 041–050
+
+KELAS XII : 061–072
+
+Nomor tersebut hanya ilustrasi.
+
+Sistem harus mengambil rentang nomor peserta berdasarkan data aktual di ruang tersebut.
+
+Jika nomor peserta tidak berurutan, tampilkan rentang terpisah.
+
+Sediakan:
+- Cetak per ruang.
+- Cetak seluruh ruang.
+- Preview.
+- Download PDF.
+
+---
+
+# J. MODUL JADWAL UJIAN
+
+Admin mengatur jadwal berdasarkan:
+- Hari.
+- Tanggal.
+- Mata pelajaran.
+- Jam mulai.
+- Jam selesai.
+- Jam ke.
+- Ruang.
+- Sesi jika online.
+- Jenjang.
+
+Sediakan master mata pelajaran.
+
+Validasi:
+1. Tidak ada benturan jadwal ruang.
+2. Tidak ada benturan jadwal sesi.
+3. Tidak ada benturan penggunaan kelas fisik.
+4. Jadwal sesuai moda ujian.
+5. Setiap jadwal memiliki tanggal dan jam yang jelas.
+
+Jadwal menjadi sumber utama dokumen ujian.
+
+---
+
+# K. MODUL PENUGASAN PENGAWAS
+
+Admin melakukan penugasan pengawas berdasarkan daftar guru yang tersedia.
+
+Gunakan tampilan tabel yang mudah diatur.
+
+Format:
+
+| Hari/Tanggal | Jam | Mata Pelajaran | Ruang | Pengawas 1 | Pengawas 2 |
+|---|---|---|---|---|---|
+
+Fitur:
+- Pilih nama guru.
+- Penugasan per hari.
+- Penugasan per mata pelajaran.
+- Penugasan per ruang.
+- Penugasan per sesi.
+- Validasi benturan jadwal guru.
+- Peringatan jika ruang belum memiliki pengawas.
+- Rekap tugas guru.
+
+Sediakan:
+- Daftar pengawas per hari.
+- Daftar pengawas per ruang.
+- Jadwal individu setiap pengawas.
+- Surat tugas pengawas.
+- Cetak massal.
+
+Jika seluruh hari, mata pelajaran, ruang, dan sesi yang digunakan sudah memiliki pengawas sesuai konfigurasi, tampilkan status lengkap.
+
+Admin dapat melanjutkan ke menu cetak.
+
+---
+
+# L. MODUL DOKUMEN SEGEL UJIAN — MODA TEKS/KERTAS
+
+Buat fitur generate dokumen segel soal dan lembar jawaban.
+
+Dokumen harus terintegrasi dengan pengaturan ujian, jadwal, ruang, peserta, dan pengawas.
+
+## Informasi yang ditampilkan
+
+- KOP madrasah.
+- Nama ujian.
+- Tahun pelajaran.
+- Hari dan tanggal.
+- Mata pelajaran.
+- Jam ke.
+- Jam mulai.
+- Jam selesai.
+- Nomor ruang.
+- Sesi jika digunakan.
+- Jumlah peserta.
+- Jumlah lembar soal.
+- Jumlah lembar jawaban.
+- Berita acara.
+- Daftar hadir.
+- Nama pengawas.
+
+Admin dapat menentukan jumlah lembar soal dan jawaban sesuai kebutuhan.
+
+Jangan menentukan jumlah dokumen secara otomatis berdasarkan asumsi.
+
+Sediakan:
+- Preview.
+- Generate per ruang.
+- Generate per mata pelajaran.
+- Generate per hari.
+- Generate seluruh dokumen.
+
+---
+
+# M. MODUL BERITA ACARA UJIAN
+
+Berita acara dibuat otomatis berdasarkan data setiap ruang.
+
+Jumlah dan komposisi kelas harus menyesuaikan peserta yang berada di ruang tersebut.
+
+Contoh:
+
+Ruang 01:
+- Kelas X-A: 10 peserta.
+- Kelas XI-A: 8 peserta.
+- Kelas XII-A: 4 peserta.
+
+Sistem mengambil data tersebut secara otomatis.
+
+Isi berita acara:
+- KOP madrasah.
+- Identitas ujian.
+- Hari dan tanggal.
+- Mata pelajaran.
+- Jam pelaksanaan.
+- Nomor ruang.
+- Sesi jika online.
+- Jumlah peserta setiap kelas.
+- Total peserta.
+- Jumlah hadir.
+- Jumlah tidak hadir.
+- Catatan kejadian.
+- Nama pengawas.
+- Tanda tangan.
+
+Berita acara harus dapat dibuat per ruang, tanggal, dan mata pelajaran.
+
+Jangan menggunakan satu template dengan jumlah kelas yang dikunci.
+
+Sistem harus menyesuaikan jumlah baris komposisi kelas secara dinamis.
+
+---
+
+# N. MODUL TATA TERTIB UJIAN
+
+Admin dapat mengunggah dokumen tata tertib.
+
+Format:
+- PDF.
+- DOCX.
+
+Sistem membaca isi dokumen dan menampilkan hasil ekstraksi.
+
+Admin dapat:
+- Memeriksa teks.
+- Memperbaiki kesalahan hasil ekstraksi.
+- Mengatur format.
+- Menambahkan identitas ujian.
+- Menambahkan KOP madrasah.
+- Mengatur ukuran kertas.
+- Mengatur margin.
+- Melihat preview.
+- Finalisasi.
+- Cetak PDF.
+
+PENTING:
+- Jangan mengubah substansi tata tertib tanpa persetujuan.
+- Pertahankan isi asli dokumen.
+- Jangan menghilangkan aturan yang sudah ada.
+- Jika dokumen berupa hasil scan, gunakan OCR dan tampilkan hasilnya untuk diperiksa sebelum finalisasi.
+
+---
+
+# O. MODUL ADMINISTRASI HP SANTRI — KHUSUS MODA ONLINE
+
+Karena peserta merupakan santri pondok dan HP tidak boleh dipegang selama ujian, seluruh pengelolaan HP dilakukan oleh panitia.
+
+Sistem harus mengelola penerimaan, penitipan, peminjaman, pengambilan, pengecasan, dan pengembalian HP.
+
+## 1. Penerimaan HP
+
+Buat formulir penerimaan:
+
+- Nama santri.
+- Kelas.
+- Jenis HP.
+- Merek/model.
+- Warna HP.
+- Nomor identifikasi atau IMEI jika diperlukan.
+- Tanggal diterima.
+- Nama penyetor.
+- Nama penerima.
+- Tanda tangan penyetor.
+- Tanda tangan penerima.
+- Status HP: Titipan atau Pinjaman.
+
+Setiap HP memiliki kode identifikasi unik.
+
+Sediakan bukti penerimaan yang dapat dicetak.
+
+## 2. Pengambilan HP
+
+Dokumen pengambilan HP memuat:
+- Hari dan tanggal.
+- Jam.
+- Nama petugas.
+- Ruang.
+- Nama santri.
+- Kelas.
+- Kode HP.
+- Jumlah HP yang diambil.
+- Jumlah HP yang diserahkan.
+- Tanda tangan petugas.
+- Tanda tangan penerima.
+
+Sistem harus mencocokkan jumlah HP fisik dengan data yang tersimpan.
+
+## 3. Pengembalian HP
+
+Catat:
+- Nama santri.
+- Kelas.
+- Kode HP.
+- Tanggal.
+- Jam.
+- Kondisi HP.
+- Nama penerima.
+- Nama petugas.
+- Tanda tangan kedua pihak.
+
+Status:
+- Belum dikembalikan.
+- Sudah dikembalikan.
+- Perlu pemeriksaan.
+
+## 4. Monitoring Pengecasan HP
+
+Buat menu khusus untuk panitia mengelola pengecasan HP.
+
+Data:
+- Kode HP.
+- Nama pemilik.
+- Kelas.
+- Nomor box.
+- Nomor slot.
+- Status pengecasan.
+- Persentase baterai jika diperiksa manual.
+- Jam mulai.
+- Jam selesai.
+- Petugas.
+
+Status:
+- Belum dicas.
+- Sedang dicas.
+- Baterai penuh.
+- Baterai lemah.
+- Selesai dicas.
+- Perlu pemeriksaan.
+
+Berikan peringatan:
+- HP masuk ke box atau slot yang tidak sesuai.
+- Ada HP yang belum tercatat.
+- Jumlah HP fisik tidak sama dengan database.
+- HP belum selesai dicas.
+- HP yang telah selesai dicas belum dipindahkan.
+
+Jangan mengklaim persentase baterai dapat dibaca otomatis jika tidak ada integrasi perangkat. Sediakan input manual.
+
+## 5. HP Pinjaman
+
+Sistem harus membedakan:
+- HP titipan orang tua atau pengurus.
+- HP pinjaman.
+- HP inventaris madrasah.
+
+Data tambahan:
+- Nama pemilik atau pemberi pinjaman.
+- Identitas HP.
+- Tanggal pinjam.
+- Rencana pengembalian.
+- Kondisi awal.
+- Kondisi saat dikembalikan.
+- Status pengembalian.
+
+Berikan label **PINJAMAN** pada seluruh dokumen yang berkaitan.
+
+Jangan mencampur data HP pinjaman dengan HP titipan.
+
+## 6. Rekap Administrasi HP
+
+Tampilkan:
+- Total HP diterima.
+- Total HP titipan.
+- Total HP pinjaman.
+- Total HP dibagikan.
+- Total HP kembali.
+- Total HP belum kembali.
+- Total HP sedang dicas.
+- Total HP selesai dicas.
+- Total HP bermasalah.
+
+Semua angka harus berasal dari database.
+
+---
+
+# P. MODUL KOP MADRASAH DAN PENGATURAN DOKUMEN
+
+Admin mengunggah KOP madrasah dalam format JPG atau PNG.
+
+Gunakan gambar KOP asli yang diunggah.
+
+Jangan:
+- Membuat ulang KOP dengan teks berbeda.
+- Mengubah logo.
+- Mengubah lambang.
+- Mengubah proporsi gambar.
+- Memotong bagian tulisan.
+- Mengganti identitas madrasah.
+
+Sediakan pengaturan:
+- Lebar KOP.
+- Tinggi proporsional.
+- Posisi KOP.
+- Jarak dari tepi kertas.
+- Preview.
+
+KOP digunakan sebagai template seluruh dokumen yang memerlukan kop surat.
+
+## Pengaturan Kertas
+
+Format:
+- A4.
+- F4/Folio.
+
+Orientasi:
+- Portrait.
+- Landscape.
+
+Pengaturan:
+- Margin atas.
+- Margin bawah.
+- Margin kiri.
+- Margin kanan.
+- Ukuran font.
+- Jarak baris.
+- Posisi KOP.
+- Header.
+- Footer.
+
+Sediakan preset pengaturan untuk:
+- Denah lokasi.
+- Denah tempat duduk.
+- Daftar hadir.
+- Label ruang.
+- Berita acara.
+- Segel.
+- Dokumen HP.
+
+Pastikan hasil preview sesuai dengan hasil PDF dan cetak.
+
+---
+
+# Q. MODUL PUSAT CETAK
+
+Seluruh dokumen dikumpulkan dalam satu menu Pusat Cetak.
+
+Filter:
+- Tahun pelajaran.
+- Nama ujian.
+- Tanggal.
+- Hari.
+- Mata pelajaran.
+- Jenjang.
+- Ruang.
+- Sesi.
+- Jenis dokumen.
+
+Jenis dokumen:
+1. DNPU.
+2. Nomor peserta.
+3. Pembagian ruang dan sesi.
+4. Denah lokasi.
+5. Denah tempat duduk.
+6. Daftar hadir.
+7. Label ruang.
+8. Jadwal ujian.
+9. Daftar pengawas.
+10. Surat tugas pengawas.
+11. Segel soal.
+12. Berita acara.
+13. Tata tertib.
+14. Penerimaan HP.
+15. Pengambilan HP.
+16. Pengembalian HP.
+17. Monitoring pengecasan.
+18. Rekap HP.
+
+Fitur:
+- Preview.
+- Cetak satu dokumen.
+- Cetak per ruang.
+- Cetak per hari.
+- Cetak per mata pelajaran.
+- Cetak massal.
+- Download PDF.
+- Download Excel untuk data tabel.
+
+Seluruh dokumen harus menggunakan sumber data yang sama.
+
+---
+
+# R. MODUL ARSIP UJIAN
+
+Setiap kegiatan ujian disimpan berdasarkan:
+- Nama ujian.
+- Tahun pelajaran.
+- Jenjang.
+- Tanggal.
+- Moda ujian.
+
+Data arsip:
+- DNPU.
+- Nomor peserta.
+- Pembagian ruang.
+- Pembagian sesi.
+- Denah lokasi.
+- Denah tempat duduk.
+- Daftar hadir.
+- Jadwal.
+- Pengawas.
+- Segel.
+- Berita acara.
+- Tata tertib.
+- Administrasi HP.
+- Dokumen cetak.
+
+Sediakan:
+- Pencarian arsip.
+- Filter tahun pelajaran.
+- Filter jenis ujian.
+- Buka arsip.
+- Download dokumen.
+- Cetak ulang.
+
+Arsip ujian yang telah selesai tidak boleh berubah tanpa tindakan resmi dan tercatat.
+
+---
+
+# S. ROLE DAN HAK AKSES
+
+Gunakan sistem role existing jika sudah tersedia.
+
+Minimal role:
+1. Super Admin.
+2. Admin Ujian.
+3. Panitia.
+4. Petugas HP.
+5. Pengawas jika diperlukan.
+
+Hak akses:
+
+**Super Admin**
+- Akses seluruh modul.
+- Pengaturan aplikasi.
+- Pengelolaan pengguna.
+- Pengelolaan arsip.
+
+**Admin Ujian**
+- Pengaturan ujian.
+- DNPU.
+- Nomor peserta.
+- Ruang dan sesi.
+- Denah lokasi.
+- Jadwal.
+- Pengawas.
+- Dokumen.
+
+**Panitia**
+- Mengakses dokumen dan operasional sesuai kewenangan.
+
+**Petugas HP**
+- Penerimaan.
+- Pengambilan.
+- Pengembalian.
+- Pengecasan.
+- Rekap HP.
+
+**Pengawas**
+- Melihat jadwal dan penugasan yang diperlukan.
+
+Seluruh hak akses harus divalidasi di backend, bukan hanya menyembunyikan menu di frontend.
+
+---
+
+# T. KEAMANAN, VALIDASI, DAN INTEGRITAS DATA
+
+WAJIB menerapkan:
+
+1. Validasi frontend dan backend.
+2. Prepared statements.
+3. Otorisasi API.
+4. Validasi file upload.
+5. Pembatasan ukuran file.
+6. Proteksi dokumen sensitif.
+7. Transaksi database untuk proses penting.
+8. Pencegahan NISN ganda.
+9. Pencegahan NIS ganda sesuai kebijakan data.
+10. Pencegahan nomor peserta ganda.
+11. Pencegahan peserta masuk dua ruang.
+12. Pencegahan peserta masuk dua sesi.
+13. Pencegahan benturan jadwal ruang.
+14. Pencegahan benturan jadwal pengawas.
+15. Riwayat perubahan data.
+16. Backup sebelum perubahan penting.
+17. Penyimpanan data permanen.
+18. Penanganan error yang jelas.
+19. Proteksi akses file hasil generate.
+20. Konfirmasi sebelum tindakan penghapusan atau finalisasi.
+
+Jangan menghapus data penting hanya karena admin melakukan generate ulang.
+
+Gunakan mekanisme draft, validasi, finalisasi, dan riwayat perubahan.
+
+---
+
+# U. ALUR KERJA UTAMA APLIKASI
+
+Seluruh sistem harus mengikuti urutan kerja berikut:
+
+**TAHAP 1 — PERSIAPAN**
+- Membuat kegiatan ujian.
+- Mengatur moda online atau teks/kertas.
+- Mengatur tanggal dan jadwal.
+- Mengatur jumlah ruang.
+- Mengatur jumlah sesi jika online.
+- Mengunggah KOP madrasah.
+
+**TAHAP 2 — DATA PESERTA**
+- Upload DNPU.
+- Validasi data.
+- Koreksi data.
+- Simpan peserta.
+
+**TAHAP 3 — PEMBAGIAN PESERTA**
+- Generate nomor peserta.
+- Generate sesi jika online.
+- Generate ruang.
+- Periksa komposisi.
+- Finalisasi DNPU.
+
+**TAHAP 4 — PENETAPAN LOKASI**
+- Buka Denah Lokasi.
+- Lihat seluruh kelas.
+- Klik kotak kelas.
+- Tentukan nomor ruang.
+- Simpan penetapan.
+- Finalisasi Denah Lokasi.
+
+**TAHAP 5 — DOKUMEN PESERTA**
+- Generate denah tempat duduk.
+- Generate daftar hadir.
+- Generate label ruang.
+
+**TAHAP 6 — PERSIAPAN OPERASIONAL**
+- Input jadwal ujian.
+- Atur pengawas.
+- Periksa benturan.
+- Pastikan seluruh ruang memiliki pengawas.
+
+**TAHAP 7 — DOKUMEN UJIAN**
+- Generate segel jika moda kertas.
+- Generate berita acara.
+- Generate tata tertib.
+- Generate dokumen pendukung.
+
+**TAHAP 8 — ADMINISTRASI HP**
+Khusus online:
+- Penerimaan HP.
+- Pendataan HP titipan dan pinjaman.
+- Pengelolaan box.
+- Pengecasan.
+- Pengambilan HP.
+- Pengembalian HP.
+
+**TAHAP 9 — PUSAT CETAK**
+- Periksa seluruh dokumen.
+- Preview.
+- Cetak per ruang.
+- Cetak per hari.
+- Cetak massal.
+
+**TAHAP 10 — ARSIP**
+- Simpan seluruh dokumen.
+- Finalisasi arsip.
+- Simpan riwayat kegiatan ujian.
+
+---
+
+# V. TAHAPAN IMPLEMENTASI TEKNIS
+
+Jangan mengerjakan seluruh modul sekaligus tanpa pengujian.
+
+Laksanakan secara bertahap:
+
+### Tahap 1: Audit Aplikasi
+Periksa struktur proyek, database, API, autentikasi, dan fitur existing.
+
+### Tahap 2: Pengaturan Ujian
+Implementasikan konfigurasi kegiatan ujian dan identitas madrasah.
+
+### Tahap 3: DNPU
+Implementasikan upload Excel, validasi, penyimpanan, dan tabel peserta.
+
+### Tahap 4: Generate Peserta
+Implementasikan nomor peserta, pembagian sesi, dan pembagian ruang.
+
+### Tahap 5: Denah Lokasi
+Implementasikan layout fisik madrasah, kotak kelas interaktif, penetapan nomor ruang, warna status, dan cetak.
+
+### Tahap 6: Denah Tempat Duduk
+Implementasikan susunan enam kotak per baris, dua celah pemisah, orientasi portrait, dan kapasitas maksimal 22 peserta.
+
+### Tahap 7: Daftar Hadir dan Label
+Implementasikan daftar hadir serta label identitas ruang.
+
+### Tahap 8: Jadwal dan Pengawas
+Implementasikan jadwal, penugasan, dan validasi benturan.
+
+### Tahap 9: Dokumen Ujian
+Implementasikan segel, berita acara, dan tata tertib.
+
+### Tahap 10: Administrasi HP
+Implementasikan penerimaan, peminjaman, pengambilan, pengecasan, dan pengembalian.
+
+### Tahap 11: Pusat Cetak dan Arsip
+Integrasikan seluruh dokumen dan sistem arsip.
+
+### Tahap 12: Pengujian dan Deployment
+Lakukan pengujian keseluruhan dan pastikan aplikasi stabil di lingkungan produksi.
+
+Setiap tahap harus diuji sebelum melanjutkan tahap berikutnya.
+
+---
+
+# W. KRITERIA KEBERHASILAN
+
+Aplikasi dinyatakan berhasil apabila:
+
+1. DNPU dapat diunggah dengan benar.
+2. Format Excel terbaca secara horizontal.
+3. NISN dan NIS tidak kehilangan angka nol di depan.
+4. Data ganda dapat terdeteksi.
+5. Nomor peserta dihasilkan otomatis dan unik.
+6. Sesi hanya digunakan sesuai moda.
+7. Ruang terisi sesuai kapasitas.
+8. Komposisi jenjang diusahakan 11:11.
+9. Tidak ada peserta hilang atau terduplikasi.
+10. Denah lokasi mengikuti layout fisik madrasah.
+11. Semua kelas tetap terlihat.
+12. Kelas yang digunakan memiliki warna berbeda.
+13. Admin dapat mengeklik kelas untuk menetapkan nomor ruang.
+14. Penetapan ruang terintegrasi dengan DNPU.
+15. Denah tempat duduk menggunakan format portrait.
+16. Denah tempat duduk memiliki enam kotak peserta per baris.
+17. Dua celah pemisah meja tidak diberi tulisan atau ikon.
+18. Kapasitas denah maksimal 22 peserta.
+19. Daftar hadir tersusun berdasarkan kelas dan alfabet.
+20. Label ruang sesuai nomor peserta aktual.
+21. Jadwal tidak mengalami benturan.
+22. Pengawas dapat ditugaskan sesuai jadwal.
+23. Segel dapat digenerate sesuai konfigurasi.
+24. Berita acara menyesuaikan jumlah kelas di setiap ruang.
+25. Tata tertib dapat diunggah dan disesuaikan.
+26. Administrasi HP mencatat seluruh transaksi.
+27. HP pinjaman memiliki penanda khusus.
+28. Pengecasan dapat dimonitor.
+29. KOP asli dapat digunakan pada dokumen.
+30. Dokumen dapat dicetak dalam A4 dan F4.
+31. PDF sesuai dengan preview.
+32. Data tetap tersimpan setelah refresh.
+33. Seluruh fitur existing tetap berjalan.
+34. Tidak ada kerusakan database atau kehilangan data akibat upgrade.
+
+---
+
+# X. INSTRUKSI AKHIR UNTUK AI DEVELOPER
+
+Bangun SAUM sebagai sistem administrasi ujian madrasah yang terintegrasi dan profesional.
+
+Prioritas utama:
+- Ketepatan data.
+- Kemudahan operasional.
+- Tampilan rapi.
+- Proses sederhana.
+- Dokumen siap cetak.
+- Integrasi antarmodul.
+- Keamanan data.
+- Stabilitas aplikasi.
+
+Jangan membuat deskripsi panjang di dalam ikon dan menu.
+
+Jangan membuat tampilan terlalu ramai.
+
+Jangan mengubah aturan bisnis tanpa persetujuan admin.
+
+Jangan mengarang data peserta, jadwal, ruang, atau pengawas.
+
+Jangan menganggap fitur selesai hanya karena tampilannya sudah dibuat.
+
+Semua tombol, formulir, tabel, proses generate, penyimpanan, filter, ekspor, dan pencetakan harus benar-benar berfungsi.
+
+Setiap hasil generate harus menggunakan data aktual dari database.
+
+Setelah implementasi, berikan laporan:
+1. Fitur yang berhasil dikembangkan.
+2. File yang dimodifikasi.
+3. File yang ditambahkan.
+4. Perubahan database.
+5. API yang dibuat atau diperbarui.
+6. Hasil pengujian.
+7. Fitur yang belum selesai.
+8. Kendala dan risiko.
+9. Petunjuk penggunaan.
+
+**TARGET AKHIR: SAUM MENJADI PUSAT ADMINISTRASI UJIAN MADRASAH YANG MAMPU MENGELOLA SELURUH PROSES UJIAN DARI PERSIAPAN PESERTA, PEMBAGIAN RUANG, PENETAPAN LOKASI, PENGAWASAN, DOKUMEN, ADMINISTRASI HP, HINGGA ARSIP SECARA TERINTEGRASI, AKURAT, DAN SIAP DIGUNAKAN.**
+
+**INGAT: UPGRADE APLIKASI EXISTING, PERTAHANKAN SELURUH FITUR YANG SUDAH BERJALAN, DAN JANGAN MELAKUKAN PERUBAHAN DI LUAR RUANG LINGKUP PENGEMBANGAN INI TANPA PERSETUJUAN.**

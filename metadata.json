@@ -1,0 +1,6 @@
+{
+  "name": "SAUM – Sistem Administrasi Ujian Madrasah",
+  "description": "Aplikasi manajemen dan administrasi ujian madrasah terintegrasi: penomoran peserta otomatis, pembagian ruang, denah tempat duduk, kartu ujian, daftar hadir, berita acara, label amplop, dan dokumen siap cetak.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
