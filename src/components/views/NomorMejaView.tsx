@@ -20,6 +20,7 @@ import {
 import { compareClasses } from '../../utils/numbering';
 import { NomorMejaCetak, NomorMejaPrintStyle } from '../documents/NomorMejaCetak';
 import { PrintToolbar } from '../documents/PrintToolbar';
+import { usePrintLayout } from '../../utils/printLayout';
 
 interface NomorMejaViewProps {
   profile: MadrasahProfile;
@@ -31,6 +32,7 @@ interface NomorMejaViewProps {
   paperPreset?: PaperPreset;
   canEdit: boolean;
   onSaveDeskNumbers: (students: Student[]) => Promise<void>;
+  onSavePreset?: (next: PaperPreset) => Promise<void>;
 }
 
 export const NomorMejaView: React.FC<NomorMejaViewProps> = ({
@@ -43,6 +45,7 @@ export const NomorMejaView: React.FC<NomorMejaViewProps> = ({
   paperPreset,
   canEdit,
   onSaveDeskNumbers,
+  onSavePreset,
 }) => {
   const [localStudents, setLocalStudents] = useState<Student[]>(students);
   const [filterRuang, setFilterRuang] = useState<string>('all');
@@ -50,10 +53,14 @@ export const NomorMejaView: React.FC<NomorMejaViewProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [printStyle, setPrintStyle] = useState<NomorMejaPrintStyle>('label_lengkap');
   const [deskRatio, setDeskRatio] = useState<number>(kursiPerMeja === 1 ? 1 : 2);
-  const [showPrintMode, setShowPrintMode] = useState<boolean>(false);
   const [hasUnsaved, setHasUnsaved] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [notice, setNotice] = useState<string>('');
+  const { layout, setLayout } = usePrintLayout(paperPreset, {
+    size: 'F4',
+    orientation: 'portrait',
+    marginMm: 6,
+  });
 
   useEffect(() => {
     setLocalStudents(students);
@@ -163,6 +170,8 @@ export const NomorMejaView: React.FC<NomorMejaViewProps> = ({
         Ruang: room ? room.namaRuang : '-',
         Sesi: isOnline ? `Sesi ${st.sesi || 1}` : '-',
         'Nomor Peserta': st.nomorPeserta || '-',
+        'User Ujian': st.usernameUjian || '-',
+        'Password Ujian': st.passwordUjian || '-',
         'Nama Lengkap': st.nama,
         Kelas: st.kelas,
       };
@@ -173,54 +182,27 @@ export const NomorMejaView: React.FC<NomorMejaViewProps> = ({
     XLSX.writeFile(wb, 'Daftar_Nomor_Meja_Kursi_SAUM.xlsx');
   };
 
-  if (showPrintMode) {
-    return (
-      <div className="space-y-4">
-        <PrintToolbar
-          title={`Cetak Nomor Meja (${
-            printStyle === 'berpasangan_2kursi'
-              ? '1 Meja = 2 Kursi'
-              : printStyle === 'kartu_angka_besar'
-              ? 'Angka Besar'
-              : printStyle === 'daftar_meja'
-              ? 'Daftar Meja'
-              : 'Label Lengkap'
-          })`}
-          onBack={() => setShowPrintMode(false)}
-          onExportExcel={handleExportExcel}
-          paperSize={paperPreset?.size || 'A4'}
-          orientation="portrait"
-        />
-        <div className="overflow-x-auto pb-10">
-          <NomorMejaCetak
-            profile={profile}
-            examConfig={examConfig}
-            students={localStudents}
-            rooms={rooms}
-            numberingConfig={numberingConfig}
-            selectedRoomId={filterRuang}
-            selectedSesi={filterSesi}
-            printStyle={printStyle}
-            kursiPerMeja={deskRatio}
-            paperPreset={paperPreset}
-          />
-        </div>
-      </div>
-    );
-  }
+  const styleTitle =
+    printStyle === 'berpasangan_2kursi'
+      ? '1 Meja = 2 Kursi'
+      : printStyle === 'kartu_angka_besar'
+      ? 'Angka Besar'
+      : printStyle === 'daftar_meja'
+      ? 'Daftar Meja'
+      : 'Label Lengkap';
 
   return (
-    <div className="space-y-6">
-      {/* Header & Print Controls */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4">
+    <div className="space-y-6 print:space-y-0">
+      {/* Header & Print Controls (no-print) */}
+      <div className="no-print bg-white p-5 rounded-xl border border-slate-200 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-200">
           <div>
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <Armchair className="w-5 h-5 text-emerald-700" />
-              Pengaturan & Cetak Nomor Meja Ujian
+              Nomor Meja Ujian: Pengaturan &amp; Layout Sebelum Cetak
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Menu khusus penomoran dan cetak stiker/label Nomor Meja per ruang (terpisah dari cetak Nomor Peserta), mendukung pola 1 Meja = 2 Kursi maupun 1 Meja = 1 Kursi.
+              Kelola nomor kursi/meja per ruang (mendukung pola 1 Meja = 2 Kursi atau 1 Kursi) dan atur layout kertas/margin sebelum dicetak langsung di halaman ini.
             </p>
           </div>
 
@@ -257,7 +239,7 @@ export const NomorMejaView: React.FC<NomorMejaViewProps> = ({
             )}
             <button
               type="button"
-              onClick={() => setShowPrintMode(true)}
+              onClick={() => window.print()}
               className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-lg cursor-pointer whitespace-nowrap"
             >
               <Printer className="w-3.5 h-3.5" /> Cetak Nomor Meja
@@ -280,15 +262,15 @@ export const NomorMejaView: React.FC<NomorMejaViewProps> = ({
               onChange={(e) => setPrintStyle(e.target.value as NomorMejaPrintStyle)}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-semibold"
             >
-              <option value="label_lengkap">Label Nomor Meja & Data Peserta (8/hal)</option>
+              <option value="label_lengkap">Label Nomor Meja &amp; Data Peserta (6/F4 • Penuh)</option>
               <option value="berpasangan_2kursi">Label Meja Berpasangan (1 Meja = 2 Kursi)</option>
-              <option value="kartu_angka_besar">Kartu Angka Nomor Meja Besar (6/hal)</option>
+              <option value="kartu_angka_besar">Kartu Angka Nomor Meja Besar (6/F4 • Penuh)</option>
               <option value="daftar_meja">Daftar Rekap Nomor Meja Per Ruang</option>
             </select>
           </div>
 
           <div>
-            <label className="block font-semibold text-slate-700 mb-1">Konfigurasi Meja & Kursi</label>
+            <label className="block font-semibold text-slate-700 mb-1">Konfigurasi Meja &amp; Kursi</label>
             <select
               value={deskRatio}
               onChange={(e) => setDeskRatio(Number(e.target.value))}
@@ -340,12 +322,54 @@ export const NomorMejaView: React.FC<NomorMejaViewProps> = ({
         </div>
       </div>
 
-      {/* Table Editor */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4">
+      {/* Inline Layout Sebelum Cetak + Full Live Sheet Preview */}
+      <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4 print:p-0 print:border-none print:bg-transparent print:rounded-none print:space-y-0">
+        <div className="no-print flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">
+              Layout Sebelum Cetak &amp; Pratinjau Lembar Nomor Meja ({sortedByDesk.length} Peserta)
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Sesuaikan ukuran kertas (F4/A4), orientasi, margin 4 sisi, jumlah kartu per lembar, dan skala cetak sebelum menekan tombol cetak.
+            </p>
+          </div>
+        </div>
+
+        <PrintToolbar
+          title={`Layout Sebelum Cetak Nomor Meja (${styleTitle})`}
+          onExportExcel={handleExportExcel}
+          layout={layout}
+          onLayoutChange={setLayout}
+          onSaveLayout={onSavePreset}
+          defaultOpenLayout={true}
+          showCardDensity={printStyle === 'label_lengkap'}
+          showKopToggle={printStyle === 'daftar_meja'}
+          isSticky={false}
+        />
+
+        <div className="overflow-x-auto bg-slate-50 p-4 rounded-lg border border-slate-200 print:overflow-visible print:p-0 print:bg-transparent print:border-none">
+          <NomorMejaCetak
+            profile={profile}
+            examConfig={examConfig}
+            students={sortedByDesk}
+            rooms={rooms}
+            numberingConfig={numberingConfig}
+            selectedRoomId={filterRuang}
+            selectedSesi={filterSesi}
+            printStyle={printStyle}
+            kursiPerMeja={deskRatio}
+            paperPreset={layout}
+            cardsPerPage={layout.cardsPerPage}
+          />
+        </div>
+      </div>
+
+      {/* Table Editor (no-print) */}
+      <div className="no-print bg-white p-5 rounded-xl border border-slate-200 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-bold text-slate-900">
-              Daftar Nomor Kursi & Meja Per Ruang ({filteredStudents.length} Peserta)
+              Daftar Nomor Kursi &amp; Meja Per Ruang ({filteredStudents.length} Peserta)
             </h3>
             <p className="text-xs text-slate-500">
               {deskRatio === 2
@@ -371,87 +395,78 @@ export const NomorMejaView: React.FC<NomorMejaViewProps> = ({
                 <th className="px-3 py-2.5 w-10 text-center">No</th>
                 <th className="px-3 py-2.5 w-28 text-center">No. Kursi</th>
                 {deskRatio === 2 && <th className="px-3 py-2.5 w-24 text-center">Meja Fisik</th>}
-                <th className="px-3 py-2.5">Ruang & Sesi</th>
+                <th className="px-3 py-2.5">Ruang &amp; Sesi</th>
                 <th className="px-3 py-2.5">No. Peserta</th>
+                <th className="px-3 py-2.5">User &amp; Pass Ujian</th>
                 <th className="px-3 py-2.5">Nama Peserta</th>
                 <th className="px-3 py-2.5 text-center">Kelas</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 tabular-nums">
-              {filteredStudents.map((st, idx) => {
-                const room = st.ruangId ? roomMap.get(st.ruangId) : undefined;
-                const seatNo = st.nomorMeja || idx + 1;
-                const mejaFisik = deskRatio === 2 ? Math.ceil(seatNo / 2) : seatNo;
-                return (
-                  <tr key={st.id} className="hover:bg-slate-50/70">
-                    <td className="px-3 py-2 text-center text-slate-500">{idx + 1}</td>
-                    <td className="px-3 py-2 text-center">
-                      <input
-                        type="number"
-                        min={1}
-                        disabled={!canEdit}
-                        value={st.nomorMeja ?? ''}
-                        onChange={(e) => {
-                          const val = e.target.value ? Math.max(1, Number(e.target.value)) : undefined;
-                          setLocalStudents((prev) =>
-                            prev.map((x) => (x.id === st.id ? { ...x, nomorMeja: val } : x))
-                          );
-                          setHasUnsaved(true);
-                        }}
-                        className="w-16 px-2 py-1 border border-slate-300 rounded text-center font-mono font-bold text-emerald-900 bg-white"
-                      />
-                    </td>
-                    {deskRatio === 2 && (
-                      <td className="px-3 py-2 text-center font-mono font-bold text-slate-800">
-                        MEJA {String(mejaFisik).padStart(2, '0')}
+              {filteredStudents.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
+                    Belum ada peserta ujian aktif. Tambahkan peserta di menu Data DNPU terlebih dahulu.
+                  </td>
+                </tr>
+              ) : (
+                filteredStudents.map((st, idx) => {
+                  const room = st.ruangId ? roomMap.get(st.ruangId) : undefined;
+                  const seatNo = st.nomorMeja || idx + 1;
+                  const mejaFisik = deskRatio === 2 ? Math.ceil(seatNo / 2) : seatNo;
+                  return (
+                    <tr key={st.id} className="hover:bg-slate-50/70">
+                      <td className="px-3 py-2 text-center text-slate-500">{idx + 1}</td>
+                      <td className="px-3 py-2 text-center">
+                        <input
+                          type="number"
+                          min={1}
+                          disabled={!canEdit}
+                          value={st.nomorMeja ?? ''}
+                          onChange={(e) => {
+                            const val = e.target.value ? Math.max(1, Number(e.target.value)) : undefined;
+                            setLocalStudents((prev) =>
+                              prev.map((x) => (x.id === st.id ? { ...x, nomorMeja: val } : x))
+                            );
+                            setHasUnsaved(true);
+                          }}
+                          className="w-16 px-2 py-1 border border-slate-300 rounded text-center font-mono font-bold text-emerald-900 bg-white"
+                        />
                       </td>
-                    )}
-                    <td className="px-3 py-2">
-                      <span className="font-semibold text-slate-900">{room ? room.namaRuang : '-'}</span>
-                      {isOnline && (
-                        <span className="ml-1.5 text-[11px] font-mono text-emerald-800">
-                          (Sesi {st.sesi || 1})
-                        </span>
+                      {deskRatio === 2 && (
+                        <td className="px-3 py-2 text-center font-mono font-bold text-slate-800">
+                          MEJA {String(mejaFisik).padStart(2, '0')}
+                        </td>
                       )}
-                    </td>
-                    <td className="px-3 py-2 font-mono text-slate-700">{st.nomorPeserta || '-'}</td>
-                    <td className="px-3 py-2 font-bold text-slate-900">{st.nama}</td>
-                    <td className="px-3 py-2 text-center font-semibold">{st.kelas}</td>
-                  </tr>
-                );
-              })}
+                      <td className="px-3 py-2">
+                        <span className="font-semibold text-slate-900">{room ? room.namaRuang : '-'}</span>
+                        {isOnline && (
+                          <span className="ml-1.5 text-[11px] font-mono text-emerald-800">
+                            (Sesi {st.sesi || 1})
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-slate-700">{st.nomorPeserta || '-'}</td>
+                      <td className="px-3 py-2 font-mono">
+                        {st.usernameUjian ? (
+                          <div className="leading-tight">
+                            <span className="font-bold text-slate-900">{st.usernameUjian}</span>
+                            <span className="text-[11px] text-slate-500 block">
+                              Pass: {st.passwordUjian || '-'}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 font-bold text-slate-900">{st.nama}</td>
+                      <td className="px-3 py-2 text-center font-semibold">{st.kelas}</td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
-        </div>
-      </div>
-
-      {/* Quick Preview of Selected Print Style */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2.5">
-          <h3 className="text-sm font-bold text-slate-900">
-            Pratinjau Cetak Nomor Meja (Halaman Pertama)
-          </h3>
-          <button
-            type="button"
-            onClick={() => setShowPrintMode(true)}
-            className="text-xs font-bold text-emerald-700 hover:text-emerald-800 inline-flex items-center gap-1 cursor-pointer"
-          >
-            <Printer className="w-3.5 h-3.5" /> Buka Mode Cetak Penuh
-          </button>
-        </div>
-        <div className="overflow-x-auto bg-slate-50 p-4 rounded-lg border border-slate-200">
-          <NomorMejaCetak
-            profile={profile}
-            examConfig={examConfig}
-            students={sortedByDesk.slice(0, 8)}
-            rooms={rooms}
-            numberingConfig={numberingConfig}
-            selectedRoomId={filterRuang}
-            selectedSesi={filterSesi}
-            printStyle={printStyle}
-            kursiPerMeja={deskRatio}
-            paperPreset={paperPreset}
-          />
         </div>
       </div>
     </div>

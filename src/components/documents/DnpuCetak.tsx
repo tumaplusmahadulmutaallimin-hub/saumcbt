@@ -10,6 +10,7 @@ import {
 import { KopSurat } from './KopSurat';
 import { compareClasses } from '../../utils/numbering';
 import { formatIndonesianDate } from '../../utils/qrBarcode';
+import { getSheetScreenStyle } from '../../utils/printLayout';
 
 interface DnpuCetakProps {
   profile: MadrasahProfile;
@@ -41,15 +42,7 @@ export const DnpuCetak: React.FC<DnpuCetakProps> = ({
       return a.nama.localeCompare(b.nama, 'id');
     });
 
-  const isF4 = paperPreset?.size === 'F4';
-  const isLandscape = paperPreset?.orientation === 'landscape';
-  const sheetClass = isLandscape
-    ? isF4
-      ? 'w-[330mm] min-h-[215mm]'
-      : 'w-[297mm] min-h-[210mm]'
-    : isF4
-    ? 'w-[215mm] min-h-[330mm]'
-    : 'w-[210mm] min-h-[297mm]';
+  const sheetStyle = getSheetScreenStyle(paperPreset);
 
   const isOnline = examConfig?.moda === 'online';
   const hasAnyLink =
@@ -63,10 +56,21 @@ export const DnpuCetak: React.FC<DnpuCetakProps> = ({
     pembagian_ruang: 'DAFTAR PEMBAGIAN RUANG & SESI PESERTA UJIAN',
   };
 
+  if (filtered.length === 0) {
+    return (
+      <div className="p-8 text-center bg-white rounded-xl border border-slate-200">
+        <p className="text-slate-500 font-medium">
+          Belum ada peserta aktif yang sesuai filter untuk dokumen {titles[mode]}.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full flex flex-col items-center">
       <div
-        className={`${sheetClass} p-[10mm] bg-white text-slate-900 border border-slate-300 shadow-sm print:border-none print:shadow-none print:p-0 print-page-break mb-8 print:mb-0`}
+        style={sheetStyle}
+        className="saum-sheet border border-slate-300 shadow-sm print-page-break mb-8 print:mb-0"
       >
         {(paperPreset?.showKop ?? true) && <KopSurat profile={profile} isCompact />}
 
@@ -106,26 +110,28 @@ export const DnpuCetak: React.FC<DnpuCetakProps> = ({
           </div>
         )}
 
-        <table className="w-full text-[9.5px] border-collapse border border-slate-900 mb-4">
+        <table className="w-full text-[9px] border-collapse border border-slate-900 mb-4">
           <thead>
             <tr className="bg-slate-100">
-              <th className="border border-slate-900 px-1.5 py-1.5 w-7 text-center">No</th>
-              <th className="border border-slate-900 px-2 py-1.5 w-24 text-center">No. Peserta</th>
-              <th className="border border-slate-900 px-1.5 py-1.5 w-12 text-center">Meja</th>
-              <th className="border border-slate-900 px-1.5 py-1.5 w-20 text-center">NISN</th>
-              <th className="border border-slate-900 px-1.5 py-1.5 w-16 text-center">NIS</th>
-              <th className="border border-slate-900 px-2 py-1.5 text-left">Nama Peserta</th>
-              <th className="border border-slate-900 px-1 py-1.5 w-7 text-center">JK</th>
+              <th className="border border-slate-900 px-1 py-1.5 w-6 text-center">No</th>
+              <th className="border border-slate-900 px-1.5 py-1.5 w-22 text-center">No. Peserta</th>
+              <th className="border border-slate-900 px-1.5 py-1.5 w-20 text-center">User Ujian</th>
+              <th className="border border-slate-900 px-1.5 py-1.5 w-16 text-center">Password</th>
+              <th className="border border-slate-900 px-1 py-1.5 w-10 text-center">Meja</th>
+              <th className="border border-slate-900 px-1.5 py-1.5 w-18 text-center">NISN</th>
+              <th className="border border-slate-900 px-1.5 py-1.5 w-14 text-center">NIS</th>
+              <th className="border border-slate-900 px-1.5 py-1.5 text-left">Nama Peserta</th>
+              <th className="border border-slate-900 px-1 py-1.5 w-6 text-center">JK</th>
               {showFullIdentity && (
-                <th className="border border-slate-900 px-2 py-1.5 text-left w-36">Tempat, Tgl Lahir</th>
+                <th className="border border-slate-900 px-1.5 py-1.5 text-left w-32">Tempat, Tgl Lahir</th>
               )}
-              <th className="border border-slate-900 px-1.5 py-1.5 w-14 text-center">Kelas</th>
+              <th className="border border-slate-900 px-1 py-1.5 w-12 text-center">Kelas</th>
               {isOnline && (
-                <th className="border border-slate-900 px-1.5 py-1.5 w-12 text-center">Sesi</th>
+                <th className="border border-slate-900 px-1 py-1.5 w-11 text-center">Sesi</th>
               )}
-              <th className="border border-slate-900 px-1.5 py-1.5 w-20 text-center">Ruang</th>
+              <th className="border border-slate-900 px-1 py-1.5 w-16 text-center">Ruang</th>
               {hasAnyLink && (
-                <th className="border border-slate-900 px-2 py-1.5 text-left">Alamat Link</th>
+                <th className="border border-slate-900 px-1.5 py-1.5 text-left">Alamat Link</th>
               )}
             </tr>
           </thead>
@@ -135,33 +141,39 @@ export const DnpuCetak: React.FC<DnpuCetakProps> = ({
               const link = st.customLink || numberingConfig?.manualLinkUrl || '-';
               return (
                 <tr key={st.id}>
-                  <td className="border border-slate-900 px-1.5 py-1 text-center tabular-nums">{idx + 1}</td>
-                  <td className="border border-slate-900 px-2 py-1 text-center font-mono font-bold">
+                  <td className="border border-slate-900 px-1 py-1 text-center tabular-nums">{idx + 1}</td>
+                  <td className="border border-slate-900 px-1.5 py-1 text-center font-mono font-bold">
                     {st.nomorPeserta || '-'}
                   </td>
-                  <td className="border border-slate-900 px-1.5 py-1 text-center font-mono font-bold tabular-nums">
+                  <td className="border border-slate-900 px-1.5 py-1 text-center font-mono font-bold">
+                    {st.usernameUjian || '-'}
+                  </td>
+                  <td className="border border-slate-900 px-1.5 py-1 text-center font-mono">
+                    {st.passwordUjian || '-'}
+                  </td>
+                  <td className="border border-slate-900 px-1 py-1 text-center font-mono font-bold tabular-nums">
                     {st.nomorMeja ? String(st.nomorMeja).padStart(2, '0') : '-'}
                   </td>
                   <td className="border border-slate-900 px-1.5 py-1 text-center font-mono tabular-nums">{st.nisn}</td>
                   <td className="border border-slate-900 px-1.5 py-1 text-center font-mono tabular-nums">{st.nis}</td>
-                  <td className="border border-slate-900 px-2 py-1 font-semibold uppercase">{st.nama}</td>
+                  <td className="border border-slate-900 px-1.5 py-1 font-semibold uppercase">{st.nama}</td>
                   <td className="border border-slate-900 px-1 py-1 text-center">{st.jenisKelamin}</td>
                   {showFullIdentity && (
-                    <td className="border border-slate-900 px-2 py-1 text-[9px]">
+                    <td className="border border-slate-900 px-1.5 py-1 text-[8.5px]">
                       {st.tempatLahir}, {formatIndonesianDate(st.tanggalLahir)}
                     </td>
                   )}
-                  <td className="border border-slate-900 px-1.5 py-1 text-center font-semibold">{st.kelas}</td>
+                  <td className="border border-slate-900 px-1 py-1 text-center font-semibold">{st.kelas}</td>
                   {isOnline && (
-                    <td className="border border-slate-900 px-1.5 py-1 text-center font-bold tabular-nums">
+                    <td className="border border-slate-900 px-1 py-1 text-center font-bold tabular-nums">
                       {st.sesi ? `Sesi ${st.sesi}` : '-'}
                     </td>
                   )}
-                  <td className="border border-slate-900 px-1.5 py-1 text-center">
+                  <td className="border border-slate-900 px-1 py-1 text-center">
                     {room ? room.namaRuang : '-'}
                   </td>
                   {hasAnyLink && (
-                    <td className="border border-slate-900 px-2 py-1 font-mono text-[8.5px] break-all">
+                    <td className="border border-slate-900 px-1.5 py-1 font-mono text-[8px] break-all">
                       {link}
                     </td>
                   )}
@@ -174,11 +186,12 @@ export const DnpuCetak: React.FC<DnpuCetakProps> = ({
         <div className="flex justify-end text-[11px] font-serif mt-4 px-4">
           <div className="text-center w-56 leading-tight">
             <p>
-              {profile.tempatTandaTangan}, {formatIndonesianDate(profile.tanggalSurat)}
+              {profile.tempatTandaTangan ? `${profile.tempatTandaTangan}, ` : ''}
+              {formatIndonesianDate(profile.tanggalSurat)}
             </p>
             <p className="font-bold">Kepala Madrasah,</p>
             <div className="h-14" />
-            <p className="font-bold underline uppercase">{profile.namaKepala}</p>
+            <p className="font-bold underline uppercase">{profile.namaKepala || '.........................'}</p>
             <p className="text-[9.5px] font-sans">NIP. {profile.nipKepala || '-'}</p>
           </div>
         </div>

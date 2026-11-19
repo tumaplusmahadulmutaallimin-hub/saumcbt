@@ -500,4 +500,13 @@ export const saumApi = {
         }),
       () => localFallbackApi.restoreBackup(payload)
     ),
+
+  resetClean: () =>
+    withFallback(
+      () =>
+        request<SaumClientState>('/api/reset-clean', {
+          method: 'POST',
+        }),
+      () => localFallbackApi.resetClean()
+    ),
 };

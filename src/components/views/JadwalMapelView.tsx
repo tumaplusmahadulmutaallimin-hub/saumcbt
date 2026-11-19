@@ -26,6 +26,7 @@ import { validateScheduleConflicts } from '../../utils/seating';
 import { extractJenjang } from '../../utils/dnpu';
 import { JadwalUjianCetak } from '../documents/JadwalUjianCetak';
 import { PrintToolbar } from '../documents/PrintToolbar';
+import { usePrintLayout } from '../../utils/printLayout';
 
 interface JadwalMapelViewProps {
   profile: MadrasahProfile;
@@ -43,6 +44,7 @@ interface JadwalMapelViewProps {
     schedules: ExamSchedule[],
     seragamPerHariJenjang?: Record<string, Record<string, string>>
   ) => Promise<void>;
+  onSavePreset?: (next: PaperPreset) => Promise<void>;
 }
 
 export const JadwalMapelView: React.FC<JadwalMapelViewProps> = ({
@@ -57,19 +59,29 @@ export const JadwalMapelView: React.FC<JadwalMapelViewProps> = ({
   paperPreset,
   canEdit,
   onSaveSchedules,
+  onSavePreset,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'jadwal' | 'mapel'>('jadwal');
   const [showPrint, setShowPrint] = useState(false);
   const [showUniformModal, setShowUniformModal] = useState(false);
   const [showAddScheduleForm, setShowAddScheduleForm] = useState(false);
+  const { layout, setLayout } = usePrintLayout(paperPreset, {
+    size: 'A4',
+    orientation: 'landscape',
+    marginMm: 8,
+  });
 
-  const classes = useMemo(
-    () =>
-      examConfig.registeredClasses && examConfig.registeredClasses.length > 0
-        ? examConfig.registeredClasses
-        : ['X-A', 'X-B', 'XI-A', 'XII-A', 'XII-B', 'XII-C'],
-    [examConfig.registeredClasses]
-  );
+  const classes = useMemo(() => {
+    const reg = examConfig.registeredClasses || [];
+    if (reg.length > 0) return reg;
+    const fromSched = new Set<string>();
+    schedules.forEach((sc) => {
+      if (sc.mapelPerKelas) {
+        Object.keys(sc.mapelPerKelas).forEach((k) => fromSched.add(k));
+      }
+    });
+    return Array.from(fromSched);
+  }, [examConfig.registeredClasses, schedules]);
 
   const jenjangList = useMemo(
     () => Array.from(new Set(classes.map((c) => extractJenjang(c)))),
@@ -84,11 +96,7 @@ export const JadwalMapelView: React.FC<JadwalMapelViewProps> = ({
   }, [schedules]);
 
   const [uniformDraft, setUniformDraft] = useState<Record<string, Record<string, string>>>(() => {
-    return examConfig.seragamPerHariJenjang || {
-      Senin: { X: 'Putih Abu-Abu', XI: 'Pramuka Lengkap', XII: 'Batik Madrasah' },
-      Selasa: { X: 'Batik Madrasah', XI: 'Putih Abu-Abu', XII: 'Pramuka Lengkap' },
-      Rabu: { X: 'Pramuka Lengkap', XI: 'Batik Madrasah', XII: 'Putih Abu-Abu' },
-    };
+    return examConfig.seragamPerHariJenjang || {};
   });
 
   const [newSubject, setNewSubject] = useState<Partial<ExamSubject>>({
@@ -269,23 +277,26 @@ export const JadwalMapelView: React.FC<JadwalMapelViewProps> = ({
 
   if (showPrint) {
     return (
-      <div>
+      <div className="space-y-4">
         <PrintToolbar
           title="Cetak Jadwal Ujian Per Kelas & Ketentuan Seragam"
           onBack={() => setShowPrint(false)}
-          paperSize={paperPreset?.size || 'A4'}
-          orientation="landscape"
+          layout={layout}
+          onLayoutChange={setLayout}
+          onSaveLayout={onSavePreset}
         />
-        <JadwalUjianCetak
-          profile={profile}
-          examConfig={examConfig}
-          schedules={schedules}
-          subjects={subjects}
-          rooms={rooms}
-          supervisors={supervisors}
-          supervisorAssignments={supervisorAssignments}
-          paperPreset={paperPreset ? { ...paperPreset, orientation: 'landscape' } : undefined}
-        />
+        <div className="overflow-x-auto pb-8 print:overflow-visible print:pb-0">
+          <JadwalUjianCetak
+            profile={profile}
+            examConfig={examConfig}
+            schedules={schedules}
+            subjects={subjects}
+            rooms={rooms}
+            supervisors={supervisors}
+            supervisorAssignments={supervisorAssignments}
+            paperPreset={layout}
+          />
+        </div>
       </div>
     );
   }
@@ -532,7 +543,7 @@ export const JadwalMapelView: React.FC<JadwalMapelViewProps> = ({
                     Waktu & Sesi
                   </th>
                   <th
-                    colSpan={classes.length}
+                    colSpan={Math.max(1, classes.length)}
                     className="border border-slate-300 px-3 py-1.5 text-center bg-emerald-50 text-emerald-950 uppercase tracking-wide"
                   >
                     Jadwal Mata Pelajaran Per Kelas
@@ -550,14 +561,27 @@ export const JadwalMapelView: React.FC<JadwalMapelViewProps> = ({
                   )}
                 </tr>
                 <tr className="bg-slate-50 text-slate-900 font-extrabold">
-                  {classes.map((cls) => (
-                    <th key={cls} className="border border-slate-300 px-2 py-2 text-center min-w-[115px]">
-                      {cls}
+                  {classes.length > 0 ? (
+                    classes.map((cls) => (
+                      <th key={cls} className="border border-slate-300 px-2 py-2 text-center min-w-[115px]">
+                        {cls}
+                      </th>
+                    ))
+                  ) : (
+                    <th className="border border-slate-300 px-2 py-2 text-center text-slate-500 font-semibold">
+                      Kelas Belum Terdaftar
                     </th>
-                  ))}
+                  )}
                 </tr>
               </thead>
               <tbody>
+                {sortedSchedules.length === 0 ? (
+                  <tr>
+                    <td colSpan={classes.length + (canEdit ? 5 : 4)} className="border border-slate-300 px-4 py-8 text-center text-slate-400">
+                      Belum ada jadwal ujian. Tambahkan Master Mapel dan klik "Tambah Slot Jadwal".
+                    </td>
+                  </tr>
+                ) : null}
                 {sortedSchedules.map((sc, idx) => {
                   const dayUniforms = {
                     ...(examConfig.seragamPerHariJenjang?.[sc.hari] || {}),

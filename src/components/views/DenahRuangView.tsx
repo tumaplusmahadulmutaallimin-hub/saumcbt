@@ -11,6 +11,7 @@ import {
 } from '../../types';
 import { DenahRuangCetak } from '../documents/DenahRuangCetak';
 import { PrintToolbar } from '../documents/PrintToolbar';
+import { usePrintLayout } from '../../utils/printLayout';
 
 interface DenahRuangViewProps {
   profile: MadrasahProfile;
@@ -27,6 +28,7 @@ interface DenahRuangViewProps {
     roomConfig: RoomDistributionConfig;
   }) => Promise<void>;
   initialRoomId?: string;
+  onSavePreset?: (next: PaperPreset) => Promise<void>;
 }
 
 export const DenahRuangView: React.FC<DenahRuangViewProps> = ({
@@ -40,6 +42,7 @@ export const DenahRuangView: React.FC<DenahRuangViewProps> = ({
   canEdit,
   onSaveRooms,
   initialRoomId,
+  onSavePreset,
 }) => {
   const [selectedRoomId, setSelectedRoomId] = useState<string>(
     initialRoomId && initialRoomId !== 'all' ? initialRoomId : rooms[0]?.id || 'all'
@@ -48,6 +51,11 @@ export const DenahRuangView: React.FC<DenahRuangViewProps> = ({
   const [swapStudentA, setSwapStudentA] = useState<string>('');
   const [swapStudentB, setSwapStudentB] = useState<string>('');
   const [showPrintMode, setShowPrintMode] = useState(false);
+  const { layout, setLayout } = usePrintLayout(paperPreset, {
+    size: 'A4',
+    orientation: 'portrait',
+    marginMm: 8,
+  });
 
   const currentRoomStudents = students
     .filter(
@@ -80,19 +88,22 @@ export const DenahRuangView: React.FC<DenahRuangViewProps> = ({
         <PrintToolbar
           title="Cetak Denah Tempat Duduk (Portrait 6 Kolom)"
           onBack={() => setShowPrintMode(false)}
-          paperSize={paperPreset?.size || 'A4'}
-          orientation="portrait"
+          layout={layout}
+          onLayoutChange={setLayout}
+          onSaveLayout={onSavePreset}
         />
-        <DenahRuangCetak
-          profile={profile}
-          examConfig={examConfig}
-          rooms={rooms}
-          students={students}
-          supervisors={supervisors}
-          selectedRoomId={selectedRoomId}
-          selectedSesi={selectedSesi > 0 ? selectedSesi : undefined}
-          paperPreset={paperPreset}
-        />
+        <div className="overflow-x-auto pb-8 print:overflow-visible print:pb-0">
+          <DenahRuangCetak
+            profile={profile}
+            examConfig={examConfig}
+            rooms={rooms}
+            students={students}
+            supervisors={supervisors}
+            selectedRoomId={selectedRoomId}
+            selectedSesi={selectedSesi > 0 ? selectedSesi : undefined}
+            paperPreset={layout}
+          />
+        </div>
       </div>
     );
   }
@@ -185,7 +196,7 @@ export const DenahRuangView: React.FC<DenahRuangViewProps> = ({
       </div>
 
       {/* Live 1:1 Sheet Preview */}
-      <div className="overflow-x-auto pb-8">
+      <div className="overflow-x-auto pb-8 print:overflow-visible print:pb-0">
         <DenahRuangCetak
           profile={profile}
           examConfig={examConfig}
@@ -194,7 +205,7 @@ export const DenahRuangView: React.FC<DenahRuangViewProps> = ({
           supervisors={supervisors}
           selectedRoomId={selectedRoomId}
           selectedSesi={selectedSesi > 0 ? selectedSesi : undefined}
-          paperPreset={paperPreset}
+          paperPreset={layout}
         />
       </div>
     </div>

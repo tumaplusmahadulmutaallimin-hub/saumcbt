@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   UserCheck,
   AlertTriangle,
@@ -55,6 +55,14 @@ export const PengawasView: React.FC<PengawasViewProps> = ({
     status: 'Aktif',
   });
   const [notice, setNotice] = useState('');
+
+  useEffect(() => {
+    if (supervisors.length > 0 && !supervisors.some((s) => s.id === selectedTeacherId)) {
+      setSelectedTeacherId(supervisors[0].id);
+    } else if (supervisors.length === 0) {
+      setSelectedTeacherId('');
+    }
+  }, [supervisors, selectedTeacherId]);
 
   const subjectMap = new Map(subjects.map((s) => [s.id, s]));
   const roomMap = new Map(rooms.map((r) => [r.id, r]));
@@ -291,6 +299,13 @@ export const PengawasView: React.FC<PengawasViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
+              {matrixSlots.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
+                    Belum ada slot jadwal dan ruang ujian. Atur Pembagian Ruang dan Jadwal Ujian terlebih dahulu.
+                  </td>
+                </tr>
+              ) : null}
               {matrixSlots.map(({ schedule, room, assignment }) => {
                 const sub = subjectMap.get(schedule.mapelId);
                 return (
@@ -388,6 +403,13 @@ export const PengawasView: React.FC<PengawasViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
+                {supervisors.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
+                      Belum ada pengawas ujian terdaftar. Tambahkan pengawas melalui formulir di atas.
+                    </td>
+                  </tr>
+                ) : null}
                 {supervisors.map((sp, idx) => (
                   <tr key={sp.id}>
                     <td className="px-3 py-2.5 text-center tabular-nums">{idx + 1}</td>
@@ -427,6 +449,13 @@ export const PengawasView: React.FC<PengawasViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
+                {dutyRecap.length === 0 ? (
+                  <tr>
+                    <td colSpan={2} className="px-4 py-6 text-center text-slate-400">
+                      Belum ada data pengawas untuk direkap.
+                    </td>
+                  </tr>
+                ) : null}
                 {dutyRecap.map(({ supervisor, count }) => (
                   <tr key={supervisor.id}>
                     <td className="px-3 py-2 font-semibold text-slate-900">{supervisor.nama}</td>
@@ -447,9 +476,13 @@ export const PengawasView: React.FC<PengawasViewProps> = ({
                 onChange={(e) => setSelectedTeacherId(e.target.value)}
                 className="px-3 py-1.5 border border-slate-300 rounded-lg bg-white font-semibold"
               >
-                {supervisors.map((sp) => (
-                  <option key={sp.id} value={sp.id}>{sp.nama}</option>
-                ))}
+                {supervisors.length === 0 ? (
+                  <option value="">-- Belum ada pengawas --</option>
+                ) : (
+                  supervisors.map((sp) => (
+                    <option key={sp.id} value={sp.id}>{sp.nama}</option>
+                  ))
+                )}
               </select>
             </div>
             <div className="space-y-2 max-h-72 overflow-y-auto">
@@ -475,6 +508,13 @@ export const PengawasView: React.FC<PengawasViewProps> = ({
                     </div>
                   );
                 })}
+              {supervisorAssignments.filter(
+                (a) => a.pengawas1Id === selectedTeacherId || a.pengawas2Id === selectedTeacherId
+              ).length === 0 && (
+                <p className="py-6 text-center text-slate-400">
+                  Belum ada jadwal mengawas yang ditugaskan untuk pengawas ini.
+                </p>
+              )}
             </div>
           </div>
         </div>

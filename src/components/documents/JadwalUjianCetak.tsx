@@ -12,6 +12,7 @@ import {
 import { KopSurat } from './KopSurat';
 import { formatDayAndDate, formatIndonesianDate } from '../../utils/qrBarcode';
 import { extractJenjang } from '../../utils/dnpu';
+import { getSheetScreenStyle } from '../../utils/printLayout';
 
 interface JadwalUjianCetakProps {
   profile: MadrasahProfile;
@@ -39,31 +40,37 @@ export const JadwalUjianCetak: React.FC<JadwalUjianCetakProps> = ({
     return a.waktuMulai.localeCompare(b.waktuMulai);
   });
 
-  const classes = examConfig?.registeredClasses && examConfig.registeredClasses.length > 0
-    ? examConfig.registeredClasses
-    : ['X-A', 'X-B', 'XI-A', 'XII-A', 'XII-B', 'XII-C'];
+  const derivedClassesFromSchedules = Array.from(
+    new Set(schedules.flatMap((s) => Object.keys(s.mapelPerKelas || {})))
+  );
+  const classes =
+    examConfig?.registeredClasses && examConfig.registeredClasses.length > 0
+      ? examConfig.registeredClasses
+      : derivedClassesFromSchedules;
 
   const jenjangList = Array.from(new Set(classes.map((c) => extractJenjang(c))));
-
-  const isF4 = paperPreset?.size === 'F4';
-  const isLandscape = (paperPreset?.orientation || 'landscape') === 'landscape';
-  const sheetClass = isLandscape
-    ? isF4
-      ? 'w-[330mm] min-h-[215mm]'
-      : 'w-[297mm] min-h-[210mm]'
-    : isF4
-    ? 'w-[215mm] min-h-[330mm]'
-    : 'w-[210mm] min-h-[297mm]';
+  const sheetStyle = getSheetScreenStyle(paperPreset, { orientation: 'landscape' });
 
   const getUniformMap = (sc: ExamSchedule): Record<string, string> => {
     const fromDay = examConfig?.seragamPerHariJenjang?.[sc.hari] || {};
     return { ...fromDay, ...(sc.seragamPerJenjang || {}) };
   };
 
+  if (sortedSchedules.length === 0) {
+    return (
+      <div className="p-8 text-center bg-white rounded-xl border border-slate-200">
+        <p className="text-slate-500 font-medium">
+          Belum ada jadwal ujian yang tersimpan. Tambahkan jadwal ujian di menu Jadwal Ujian terlebih dahulu.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full flex flex-col items-center">
       <div
-        className={`${sheetClass} p-[10mm] bg-white text-slate-900 border border-slate-300 shadow-sm print:border-none print:shadow-none print:p-0 print-page-break mb-8 print:mb-0`}
+        style={sheetStyle}
+        className="saum-sheet border border-slate-300 shadow-sm print-page-break mb-8 print:mb-0"
       >
         {(paperPreset?.showKop ?? true) && <KopSurat profile={profile} isCompact />}
 
@@ -173,16 +180,19 @@ export const JadwalUjianCetak: React.FC<JadwalUjianCetakProps> = ({
             <p className="font-bold">Mengetahui,</p>
             <p className="font-bold">Kepala Madrasah,</p>
             <div className="h-12" />
-            <p className="font-bold underline uppercase">{profile.namaKepala}</p>
+            <p className="font-bold underline uppercase">{profile.namaKepala || '.........................'}</p>
             <p className="text-[9.5px] font-sans">NIP. {profile.nipKepala || '-'}</p>
           </div>
           <div className="text-center w-56 leading-tight">
             <p>
-              {profile.tempatTandaTangan}, {formatIndonesianDate(profile.tanggalSurat)}
+              {profile.tempatTandaTangan ? `${profile.tempatTandaTangan}, ` : ''}
+              {formatIndonesianDate(profile.tanggalSurat)}
             </p>
             <p className="font-bold">Ketua Panitia Ujian,</p>
             <div className="h-12" />
-            <p className="font-bold underline uppercase">{profile.namaKetuaPanitia || profile.namaKepala}</p>
+            <p className="font-bold underline uppercase">
+              {profile.namaKetuaPanitia || profile.namaKepala || '.........................'}
+            </p>
             <p className="text-[9.5px] font-sans">NIP. {profile.nipKetuaPanitia || '-'}</p>
           </div>
         </div>

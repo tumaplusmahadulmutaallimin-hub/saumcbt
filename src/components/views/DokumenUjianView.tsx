@@ -29,6 +29,7 @@ import { SegelSoalCetak } from '../documents/SegelSoalCetak';
 import { BeritaAcara } from '../documents/BeritaAcara';
 import { TataTertib } from '../documents/TataTertib';
 import { PrintToolbar } from '../documents/PrintToolbar';
+import { resolvePaperPreset, usePrintLayout } from '../../utils/printLayout';
 
 interface DokumenUjianViewProps {
   profile: MadrasahProfile;
@@ -47,6 +48,7 @@ interface DokumenUjianViewProps {
     sealConfigs?: SealDocConfig[];
     tataTertibDocs?: TataTertibDoc[];
   }) => Promise<void>;
+  onSavePreset?: (preset: PaperPreset) => Promise<void>;
 }
 
 export const DokumenUjianView: React.FC<DokumenUjianViewProps> = ({
@@ -63,6 +65,7 @@ export const DokumenUjianView: React.FC<DokumenUjianViewProps> = ({
   paperPresets,
   canEdit,
   onSaveDokumenUjian,
+  onSavePreset,
 }) => {
   const [subTab, setSubTab] = useState<'segel' | 'berita_acara' | 'tata_tertib'>(
     examConfig.moda === 'kertas' ? 'segel' : 'berita_acara'
@@ -188,6 +191,31 @@ export const DokumenUjianView: React.FC<DokumenUjianViewProps> = ({
 
   const segelPreset = paperPresets.find((p) => p.id === 'segel');
   const baPreset = paperPresets.find((p) => p.id === 'berita_acara');
+  const defaultPreset = paperPresets.find((p) => p.id === 'default');
+
+  const { layout: segelLayout, setLayout: setSegelLayout } = usePrintLayout(segelPreset, {
+    size: 'A4',
+    orientation: 'portrait',
+    marginMm: 10,
+  });
+  const { layout: baLayout, setLayout: setBaLayout } = usePrintLayout(baPreset, {
+    size: 'A4',
+    orientation: 'portrait',
+    marginMm: 10,
+  });
+  const { layout: tatibLayout, setLayout: setTatibLayout } = usePrintLayout(
+    {
+      ...(defaultPreset || {}),
+      id: defaultPreset?.id || 'default',
+      label: currentTatib?.title || 'Tata Tertib Ujian',
+      size: tatibPaperSize,
+      marginTopMm: tatibMarginMm,
+      marginRightMm: tatibMarginMm,
+      marginBottomMm: tatibMarginMm,
+      marginLeftMm: tatibMarginMm,
+    },
+    { size: tatibPaperSize, orientation: 'portrait', marginMm: tatibMarginMm }
+  );
 
   return (
     <div className="space-y-6">
@@ -346,11 +374,12 @@ export const DokumenUjianView: React.FC<DokumenUjianViewProps> = ({
 
           <PrintToolbar
             title="Segel Naskah Soal & LJK"
-            paperSize={segelPreset?.size || 'A4'}
-            orientation="portrait"
+            layout={segelLayout}
+            onLayoutChange={setSegelLayout}
+            onSaveLayout={onSavePreset}
           />
 
-          <div className="overflow-x-auto pb-8">
+          <div className="overflow-x-auto pb-8 print:overflow-visible print:pb-0">
             <SegelSoalCetak
               profile={profile}
               rooms={rooms}
@@ -362,7 +391,7 @@ export const DokumenUjianView: React.FC<DokumenUjianViewProps> = ({
               sealConfigs={sealConfigs}
               selectedRoomId={selectedRoomId}
               selectedScheduleId={selectedScheduleId}
-              paperPreset={segelPreset}
+              paperPreset={segelLayout}
             />
           </div>
         </div>
@@ -400,11 +429,12 @@ export const DokumenUjianView: React.FC<DokumenUjianViewProps> = ({
 
           <PrintToolbar
             title="Berita Acara Pelaksanaan Ujian (Dinamis Per Ruang)"
-            paperSize={baPreset?.size || 'A4'}
-            orientation="portrait"
+            layout={baLayout}
+            onLayoutChange={setBaLayout}
+            onSaveLayout={onSavePreset}
           />
 
-          <div className="overflow-x-auto pb-8">
+          <div className="overflow-x-auto pb-8 print:overflow-visible print:pb-0">
             <BeritaAcara
               profile={profile}
               examConfig={examConfig}
@@ -416,7 +446,7 @@ export const DokumenUjianView: React.FC<DokumenUjianViewProps> = ({
               supervisorAssignments={supervisorAssignments}
               selectedRoomId={selectedRoomId}
               selectedScheduleId={selectedScheduleId}
-              paperPreset={baPreset}
+              paperPreset={baLayout}
             />
           </div>
         </div>
@@ -494,7 +524,11 @@ export const DokumenUjianView: React.FC<DokumenUjianViewProps> = ({
                 <select
                   disabled={!canEdit}
                   value={tatibPaperSize}
-                  onChange={(e) => setTatibPaperSize(e.target.value as PaperSize)}
+                  onChange={(e) => {
+                    const nextSize = e.target.value as PaperSize;
+                    setTatibPaperSize(nextSize);
+                    setTatibLayout((prev) => resolvePaperPreset({ ...prev, size: nextSize }));
+                  }}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
                 >
                   <option value="A4">A4 (210 x 297 mm)</option>
@@ -502,14 +536,26 @@ export const DokumenUjianView: React.FC<DokumenUjianViewProps> = ({
                 </select>
               </div>
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Margin Halaman (mm)</label>
+                <label className="block font-semibold text-slate-700 mb-1">Margin Halaman Default (mm)</label>
                 <input
                   type="number"
                   min={5}
                   max={25}
                   disabled={!canEdit}
                   value={tatibMarginMm}
-                  onChange={(e) => setTatibMarginMm(Number(e.target.value))}
+                  onChange={(e) => {
+                    const nextM = Number(e.target.value);
+                    setTatibMarginMm(nextM);
+                    setTatibLayout((prev) =>
+                      resolvePaperPreset({
+                        ...prev,
+                        marginTopMm: nextM,
+                        marginRightMm: nextM,
+                        marginBottomMm: nextM,
+                        marginLeftMm: nextM,
+                      })
+                    );
+                  }}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono tabular-nums"
                 />
               </div>
@@ -531,15 +577,21 @@ export const DokumenUjianView: React.FC<DokumenUjianViewProps> = ({
 
           <PrintToolbar
             title={currentTatib.title}
-            paperSize={tatibPaperSize}
-            orientation="portrait"
+            layout={tatibLayout}
+            onLayoutChange={(next) => {
+              setTatibLayout(next);
+              setTatibPaperSize(next.size);
+              setTatibMarginMm(next.marginTopMm);
+            }}
+            onSaveLayout={onSavePreset}
           />
 
-          <div className="overflow-x-auto pb-8">
+          <div className="overflow-x-auto pb-8 print:overflow-visible print:pb-0">
             <TataTertib
               profile={profile}
               type={currentTatib.target}
               tataTertibDocs={tataTertibDocs}
+              paperPreset={tatibLayout}
             />
           </div>
         </div>

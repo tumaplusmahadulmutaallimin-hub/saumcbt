@@ -12,8 +12,25 @@ import {
   CheckCircle2,
   AlertTriangle,
   X,
+  KeyRound,
+  RefreshCw,
+  DoorClosed,
+  Shuffle,
+  Sparkles,
+  Hash,
+  Printer,
 } from 'lucide-react';
-import { ExamConfig, ExamRoom, JenisKelamin, StatusPeserta, Student } from '../../types';
+import {
+  ExamConfig,
+  ExamRoom,
+  JenisKelamin,
+  NumberingConfig,
+  NumberingHistoryEntry,
+  RoomDistributionConfig,
+  StatusPeserta,
+  Student,
+  UserAccount,
+} from '../../types';
 import {
   DnpuHeaderMapping,
   DnpuValidationRow,
@@ -25,23 +42,53 @@ import {
   revalidateEditedDnpuRows,
   validateDnpuRows,
 } from '../../utils/dnpu';
+import {
+  createReadablePassword,
+  formatParticipantNumber,
+  generateExamCredentials,
+  generateStudentNumbers,
+  validateExamCredentials,
+  validateParticipantNumbers,
+} from '../../utils/numbering';
+import { distributeRoomsCrossJenjang, distributeSessions } from '../../utils/seating';
 
 interface DnpuViewProps {
   students: Student[];
   rooms: ExamRoom[];
   examConfig: ExamConfig;
+  numberingConfig: NumberingConfig;
+  roomConfig: RoomDistributionConfig;
+  currentUser: UserAccount;
   canEdit: boolean;
   onSaveStudents: (students: Student[], backupReason?: string) => Promise<void>;
+  onSaveNumbering: (payload: {
+    students: Student[];
+    numberingConfig: NumberingConfig;
+    historyEntry?: NumberingHistoryEntry;
+    finalize?: boolean;
+  }) => Promise<void>;
+  onSaveRooms: (payload: {
+    students: Student[];
+    rooms: ExamRoom[];
+    roomConfig: RoomDistributionConfig;
+  }) => Promise<void>;
   onToggleFinalize: (finalized: boolean) => Promise<void>;
+  onNavigate?: (tab: string) => void;
 }
 
 export const DnpuView: React.FC<DnpuViewProps> = ({
   students,
   rooms,
   examConfig,
+  numberingConfig,
+  roomConfig,
+  currentUser,
   canEdit,
   onSaveStudents,
+  onSaveNumbering,
+  onSaveRooms,
   onToggleFinalize,
+  onNavigate,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState('');
@@ -49,6 +96,11 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
   const [filterJenjang, setFilterJenjang] = useState('all');
   const [filterRuang, setFilterRuang] = useState('all');
   const [filterSesi, setFilterSesi] = useState('all');
+
+  // Master Generator Config States
+  const [localNumbering, setLocalNumbering] = useState<NumberingConfig>(numberingConfig);
+  const [localRoomConfig, setLocalRoomConfig] = useState<RoomDistributionConfig>(roomConfig);
+  const [masterBusy, setMasterBusy] = useState<string>('');
 
   // Import Wizard State
   const [importHeaders, setImportHeaders] = useState<string[]>([]);
@@ -63,8 +115,46 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
   const [isAddMode, setIsAddMode] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Student | null>(null);
   const [errorBanner, setErrorBanner] = useState('');
+  const [statusBanner, setStatusBanner] = useState('');
+
+  // Generate Credentials Modal State
+  const [showCredModal, setShowCredModal] = useState(false);
+  const [credBasis, setCredBasis] = useState<'nomor_peserta' | 'nisn' | 'nis' | 'kode_urut'>(
+    numberingConfig.userBasis || 'nomor_peserta'
+  );
+  const [credPrefix, setCredPrefix] = useState(numberingConfig.userPrefix || '');
+  const [credPassLength, setCredPassLength] = useState<number>(numberingConfig.passwordLength || 6);
+  const [credOverwrite, setCredOverwrite] = useState<boolean>(true);
+  const [isGeneratingCreds, setIsGeneratingCreds] = useState<boolean>(false);
+
+  React.useEffect(() => {
+    setLocalNumbering(numberingConfig);
+  }, [numberingConfig]);
+
+  React.useEffect(() => {
+    setLocalRoomConfig(roomConfig);
+  }, [roomConfig]);
 
   const roomMap = new Map(rooms.map((r) => [r.id, r]));
+  const nomorValidation = useMemo(() => validateParticipantNumbers(students), [students]);
+  const credValidation = useMemo(() => validateExamCredentials(students), [students]);
+  const activeStudentsCount = useMemo(
+    () => students.filter((s) => s.status === 'Aktif').length,
+    [students]
+  );
+  const roomAssignedCount = useMemo(
+    () => students.filter((s) => s.status === 'Aktif' && Boolean(s.ruangId)).length,
+    [students]
+  );
+  const sessionAssignedCount = useMemo(
+    () => students.filter((s) => s.status === 'Aktif' && Boolean(s.sesi)).length,
+    [students]
+  );
+  const previewNumberSample = formatParticipantNumber(
+    localNumbering,
+    localNumbering.nomorAwal || 1,
+    students[0]?.kelas || 'X'
+  );
 
   const distinctClasses = useMemo(
     () => Array.from(new Set(students.map((s) => s.kelas).filter(Boolean))).sort(),
@@ -78,7 +168,14 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
   const filteredStudents = useMemo(() => {
     const q = search.trim().toLowerCase();
     return students.filter((s) => {
-      if (q && !s.nama.toLowerCase().includes(q) && !s.nisn.includes(q) && !s.nis.includes(q) && !(s.nomorPeserta || '').toLowerCase().includes(q)) {
+      if (
+        q &&
+        !s.nama.toLowerCase().includes(q) &&
+        !s.nisn.includes(q) &&
+        !s.nis.includes(q) &&
+        !(s.nomorPeserta || '').toLowerCase().includes(q) &&
+        !(s.usernameUjian || '').toLowerCase().includes(q)
+      ) {
         return false;
       }
       if (filterKelas !== 'all' && s.kelas !== filterKelas) return false;
@@ -165,6 +262,8 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
       tempatLahir: r.tempatLahir || '-',
       tanggalLahir: r.tanggalLahir || '',
       nomorPeserta: '',
+      usernameUjian: r.usernameUjian || '',
+      passwordUjian: r.passwordUjian || '',
       status: 'Aktif',
     }));
 
@@ -204,6 +303,193 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
     setDeleteTarget(null);
   };
 
+  const handleGenerateCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorBanner('');
+    setStatusBanner('');
+    const activeCount = students.filter((s) => s.status === 'Aktif').length;
+    if (activeCount === 0) {
+      setErrorBanner('Belum ada peserta aktif di DNPU untuk dibuatkan User & Password Ujian.');
+      setShowCredModal(false);
+      return;
+    }
+    setIsGeneratingCreds(true);
+    try {
+      const updated = generateExamCredentials(students, {
+        basis: credBasis,
+        prefix: credPrefix,
+        passwordLength: credPassLength,
+        overwriteExisting: credOverwrite,
+        sortBy: localNumbering.urutBerdasarkan,
+        urutanKelas: localNumbering.urutanKelas,
+      });
+      await onSaveStudents(updated, 'generate-exam-credentials');
+      setShowCredModal(false);
+      setStatusBanner(`User & Password Ujian berhasil dibuat untuk ${activeCount} peserta aktif.`);
+    } catch (err) {
+      setErrorBanner(err instanceof Error ? err.message : 'Gagal membuat User & Password Ujian');
+    } finally {
+      setIsGeneratingCreds(false);
+    }
+  };
+
+  const handleMasterGenerateNomor = async () => {
+    setErrorBanner('');
+    setStatusBanner('');
+    if (activeStudentsCount === 0) {
+      setErrorBanner('Belum ada peserta aktif di DNPU untuk dibuatkan Nomor Peserta.');
+      return;
+    }
+    setMasterBusy('nomor');
+    try {
+      const updated = generateStudentNumbers(students, localNumbering);
+      await onSaveNumbering({
+        students: updated,
+        numberingConfig: localNumbering,
+        historyEntry: {
+          id: `nh-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          actor: currentUser.nama,
+          totalGenerated: updated.filter((s) => s.status === 'Aktif' && s.nomorPeserta).length,
+          formatPreview: previewNumberSample,
+          note: 'Generate master Nomor Peserta dari Data DNPU',
+        },
+        finalize: true,
+      });
+      setStatusBanner(`Nomor Peserta berhasil digenerate untuk ${activeStudentsCount} peserta aktif.`);
+    } catch (err) {
+      setErrorBanner(err instanceof Error ? err.message : 'Gagal membuat Nomor Peserta.');
+    } finally {
+      setMasterBusy('');
+    }
+  };
+
+  const handleMasterGenerateSessions = async () => {
+    setErrorBanner('');
+    setStatusBanner('');
+    if (activeStudentsCount === 0) {
+      setErrorBanner('Belum ada peserta aktif di DNPU untuk dibagi ke sesi ujian.');
+      return;
+    }
+    setMasterBusy('sesi');
+    try {
+      const updated = distributeSessions(students, examConfig.jumlahSesi);
+      await onSaveRooms({
+        students: updated,
+        rooms,
+        roomConfig: localRoomConfig,
+      });
+      setStatusBanner(
+        `Peserta aktif berhasil dibagi merata ke ${examConfig.jumlahSesi} sesi ujian.`
+      );
+    } catch (err) {
+      setErrorBanner(err instanceof Error ? err.message : 'Gagal membagi sesi ujian.');
+    } finally {
+      setMasterBusy('');
+    }
+  };
+
+  const handleMasterGenerateRooms = async () => {
+    setErrorBanner('');
+    setStatusBanner('');
+    if (activeStudentsCount === 0) {
+      setErrorBanner('Belum ada peserta aktif di DNPU untuk dibagi ke ruang ujian.');
+      return;
+    }
+    if (rooms.some((r) => r.isLocked)) {
+      setErrorBanner(
+        'Sebagian ruang dikunci. Buka kunci ruang pada menu Pembagian Ruang & Sesi terlebih dahulu.'
+      );
+      return;
+    }
+    setMasterBusy('ruang');
+    try {
+      const cleanConfig: RoomDistributionConfig = {
+        ...localRoomConfig,
+        kapasitasPerRuang: Math.min(22, Math.max(1, localRoomConfig.kapasitasPerRuang || 22)),
+      };
+      const res = distributeRoomsCrossJenjang(students, rooms, cleanConfig, examConfig.moda);
+      await onSaveRooms({
+        students: res.updatedStudents,
+        rooms: res.updatedRooms,
+        roomConfig: cleanConfig,
+      });
+      setStatusBanner(
+        `Pembagian ${res.updatedRooms.length} ruang & nomor kursi berhasil digenerate untuk ${activeStudentsCount} peserta.${
+          res.warnings.length > 0 ? ` (${res.warnings[0]})` : ''
+        }`
+      );
+    } catch (err) {
+      setErrorBanner(err instanceof Error ? err.message : 'Gagal membagi ruang ujian.');
+    } finally {
+      setMasterBusy('');
+    }
+  };
+
+  const handleMasterGenerateAll = async () => {
+    setErrorBanner('');
+    setStatusBanner('');
+    if (activeStudentsCount === 0) {
+      setErrorBanner('Belum ada peserta aktif di DNPU. Tambahkan atau impor data peserta terlebih dahulu.');
+      return;
+    }
+    if (rooms.some((r) => r.isLocked)) {
+      setErrorBanner(
+        'Sebagian ruang dikunci. Buka kunci ruang di menu Pembagian Ruang & Sesi sebelum menjalankan Generate Semua.'
+      );
+      return;
+    }
+    setMasterBusy('all');
+    try {
+      const stepNomor = generateStudentNumbers(students, localNumbering);
+      const stepSesi =
+        examConfig.moda === 'online'
+          ? distributeSessions(stepNomor, examConfig.jumlahSesi)
+          : stepNomor;
+      const cleanRoomCfg: RoomDistributionConfig = {
+        ...localRoomConfig,
+        kapasitasPerRuang: Math.min(22, Math.max(1, localRoomConfig.kapasitasPerRuang || 22)),
+      };
+      const roomRes = distributeRoomsCrossJenjang(stepSesi, rooms, cleanRoomCfg, examConfig.moda);
+      const finalStudents = generateExamCredentials(roomRes.updatedStudents, {
+        basis: credBasis,
+        prefix: credPrefix,
+        passwordLength: credPassLength,
+        overwriteExisting: credOverwrite,
+        sortBy: localNumbering.urutBerdasarkan,
+        urutanKelas: localNumbering.urutanKelas,
+      });
+
+      await onSaveRooms({
+        students: finalStudents,
+        rooms: roomRes.updatedRooms,
+        roomConfig: cleanRoomCfg,
+      });
+      await onSaveNumbering({
+        students: finalStudents,
+        numberingConfig: localNumbering,
+        historyEntry: {
+          id: `nh-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          actor: currentUser.nama,
+          totalGenerated: finalStudents.filter((s) => s.status === 'Aktif' && s.nomorPeserta).length,
+          formatPreview: previewNumberSample,
+          note: 'Generate master otomatis DNPU (No. Peserta, Ruang, Sesi, User & Password)',
+        },
+        finalize: true,
+      });
+      setStatusBanner(
+        `Generate Master selesai: Nomor Peserta, ${
+          examConfig.moda === 'online' ? `${examConfig.jumlahSesi} Sesi, ` : ''
+        }${roomRes.updatedRooms.length} Ruang, serta User & Password berhasil dibuat untuk ${activeStudentsCount} peserta.`
+      );
+    } catch (err) {
+      setErrorBanner(err instanceof Error ? err.message : 'Gagal menjalankan Generate Semua.');
+    } finally {
+      setMasterBusy('');
+    }
+  };
+
   const invalidPreviewCount = previewRows.filter((r) => !r.isValid).length;
 
   return (
@@ -224,7 +510,11 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Total {students.length} peserta • Impor Excel (.xlsx/.xls) / CSV dengan pengecekan NISN/NIS ganda & leading zero otomatis.
+            Total {students.length} peserta &bull; Akun Ujian Terisi:{' '}
+            <span className="font-mono font-semibold text-slate-700">
+              {credValidation.totalActive - credValidation.missingCount}/{credValidation.totalActive}
+            </span>{' '}
+            &bull; Impor Excel/CSV otomatis menjaga leading zero NISN/NIS.
           </p>
         </div>
 
@@ -245,6 +535,14 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
 
           {canEdit && (
             <>
+              <button
+                type="button"
+                onClick={() => setShowCredModal(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-emerald-900 bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 rounded-lg cursor-pointer whitespace-nowrap"
+              >
+                <KeyRound className="w-3.5 h-3.5 text-emerald-700" /> Generate User &amp; Password
+              </button>
+
               <input
                 ref={fileInputRef}
                 type="file"
@@ -267,11 +565,13 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
                     nisn: '',
                     nis: '',
                     nama: '',
-                    tempatLahir: 'Bandung',
-                    tanggalLahir: '2010-01-01',
+                    tempatLahir: '',
+                    tanggalLahir: '',
                     jenisKelamin: 'L',
-                    kelas: examConfig.registeredClasses[0] || 'X-A',
+                    kelas: examConfig.registeredClasses[0] || '',
                     nomorPeserta: '',
+                    usernameUjian: '',
+                    passwordUjian: '',
                     status: 'Aktif',
                   });
                 }}
@@ -303,6 +603,205 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
         </div>
       </div>
 
+      {canEdit && (
+        <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">
+                Master Generate Data Ujian (No. Peserta, Ruang, Sesi &amp; User/Password)
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5 tabular-nums">
+                Terisi: No. Peserta{' '}
+                <strong className="text-slate-800">
+                  {nomorValidation.totalActive - nomorValidation.missingCount}/{activeStudentsCount}
+                </strong>{' '}
+                &bull; Ruang{' '}
+                <strong className="text-slate-800">
+                  {roomAssignedCount}/{activeStudentsCount}
+                </strong>{' '}
+                ({rooms.length} Ruang)
+                {examConfig.moda === 'online' && (
+                  <>
+                    {' '}
+                    &bull; Sesi{' '}
+                    <strong className="text-slate-800">
+                      {sessionAssignedCount}/{activeStudentsCount}
+                    </strong>{' '}
+                    ({examConfig.jumlahSesi} Sesi)
+                  </>
+                )}{' '}
+                &bull; Akun Ujian{' '}
+                <strong className="text-slate-800">
+                  {credValidation.totalActive - credValidation.missingCount}/{activeStudentsCount}
+                </strong>
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {onNavigate && (
+                <button
+                  type="button"
+                  onClick={() => onNavigate('penomoran')}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg cursor-pointer whitespace-nowrap"
+                >
+                  <Printer className="w-3.5 h-3.5 text-emerald-700" /> Barcode &amp; Cetak Kartu
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={masterBusy !== ''}
+                onClick={handleMasterGenerateAll}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-lg cursor-pointer whitespace-nowrap disabled:opacity-60"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                {masterBusy === 'all' ? 'Memproses Semua...' : 'Generate Semua Otomatis'}
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Master Parameters */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 text-xs">
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">Kode Tahun</label>
+              <input
+                value={localNumbering.kodeTahun}
+                onChange={(e) => setLocalNumbering({ ...localNumbering, kodeTahun: e.target.value })}
+                className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-mono"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">Kode Madrasah</label>
+              <input
+                value={localNumbering.kodeMadrasah}
+                onChange={(e) =>
+                  setLocalNumbering({ ...localNumbering, kodeMadrasah: e.target.value })
+                }
+                className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-mono"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">
+                Contoh Format ({localNumbering.digitUrut} digit)
+              </label>
+              <div className="px-2.5 py-1.5 border border-slate-200 rounded-lg bg-slate-50 font-mono font-bold text-emerald-900 truncate">
+                {previewNumberSample}
+              </div>
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">Urutan Nomor</label>
+              <select
+                value={localNumbering.urutBerdasarkan}
+                onChange={(e) =>
+                  setLocalNumbering({
+                    ...localNumbering,
+                    urutBerdasarkan: e.target.value as NumberingConfig['urutBerdasarkan'],
+                  })
+                }
+                className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-semibold"
+              >
+                <option value="kelas_lalu_nama">Kelas → Alfabet</option>
+                <option value="nama_alfabetis">Alfabet Global</option>
+                <option value="nisn">NISN</option>
+                <option value="nis">NIS</option>
+              </select>
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">Kapasitas / Ruang</label>
+              <input
+                type="number"
+                min={1}
+                max={22}
+                value={localRoomConfig.kapasitasPerRuang}
+                onChange={(e) =>
+                  setLocalRoomConfig({
+                    ...localRoomConfig,
+                    kapasitasPerRuang: Math.min(22, Math.max(1, Number(e.target.value) || 20)),
+                  })
+                }
+                className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-mono tabular-nums"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">Metode Pembagian Ruang</label>
+              <select
+                value={localRoomConfig.metode}
+                onChange={(e) =>
+                  setLocalRoomConfig({
+                    ...localRoomConfig,
+                    metode: e.target.value as RoomDistributionConfig['metode'],
+                  })
+                }
+                className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-semibold"
+              >
+                <option value="silang_jenjang_11_11">Silang Jenjang 11:11</option>
+                <option value="silang_kelas">Silang Kelas</option>
+                <option value="seimbang_gender">Seimbang Gender</option>
+                <option value="nomor_peserta">Urut No. Peserta</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Individual Master Generate Triggers */}
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+            <button
+              type="button"
+              disabled={masterBusy !== ''}
+              onClick={handleMasterGenerateNomor}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-emerald-900 bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 rounded-lg cursor-pointer whitespace-nowrap disabled:opacity-60"
+            >
+              <Hash className="w-3.5 h-3.5 text-emerald-700" />
+              {masterBusy === 'nomor' ? 'Menyusun Nomor...' : 'Generate No. Peserta'}
+            </button>
+
+            <button
+              type="button"
+              disabled={masterBusy !== ''}
+              onClick={handleMasterGenerateRooms}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-800 bg-slate-100 border border-slate-300 hover:bg-slate-200 rounded-lg cursor-pointer whitespace-nowrap disabled:opacity-60"
+            >
+              <DoorClosed className="w-3.5 h-3.5 text-emerald-700" />
+              {masterBusy === 'ruang' ? 'Membagi Ruang...' : 'Generate Pembagian Ruang'}
+            </button>
+
+            {examConfig.moda === 'online' && (
+              <button
+                type="button"
+                disabled={masterBusy !== ''}
+                onClick={handleMasterGenerateSessions}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-800 bg-slate-100 border border-slate-300 hover:bg-slate-200 rounded-lg cursor-pointer whitespace-nowrap disabled:opacity-60"
+              >
+                <Shuffle className="w-3.5 h-3.5 text-emerald-700" />
+                {masterBusy === 'sesi'
+                  ? 'Membagi Sesi...'
+                  : `Generate Sesi (${examConfig.jumlahSesi} Sesi)`}
+              </button>
+            )}
+
+            <button
+              type="button"
+              disabled={masterBusy !== ''}
+              onClick={() => setShowCredModal(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-800 bg-slate-100 border border-slate-300 hover:bg-slate-200 rounded-lg cursor-pointer whitespace-nowrap disabled:opacity-60"
+            >
+              <KeyRound className="w-3.5 h-3.5 text-emerald-700" />
+              Generate User &amp; Password
+            </button>
+          </div>
+        </div>
+      )}
+
+      {statusBanner && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between">
+          <span className="inline-flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            {statusBanner}
+          </span>
+          <button onClick={() => setStatusBanner('')} className="text-emerald-700 cursor-pointer">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {errorBanner && (
         <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between">
           <span>{errorBanner}</span>
@@ -318,7 +817,7 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
           <input
             type="text"
-            placeholder="Cari Nama, NISN, NIS, atau Nomor Peserta..."
+            placeholder="Cari Nama, NISN, NIS, No. Peserta, atau User Ujian..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg focus:outline-hidden focus:border-emerald-700"
@@ -386,6 +885,7 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
                 <th className="px-3 py-3 text-center">JK</th>
                 <th className="px-3 py-3">Kelas</th>
                 <th className="px-3 py-3">No. Peserta</th>
+                <th className="px-3 py-3">User &amp; Pass Ujian</th>
                 {examConfig.moda === 'online' && <th className="px-3 py-3 text-center">Sesi</th>}
                 <th className="px-3 py-3">Ruang / Meja</th>
                 <th className="px-3 py-3 text-center">Status</th>
@@ -395,7 +895,7 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
             <tbody className="divide-y divide-slate-100">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={12} className="px-4 py-8 text-center text-slate-400">
                     Tidak ada peserta yang sesuai filter pencarian.
                   </td>
                 </tr>
@@ -412,6 +912,18 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
                       <td className="px-3 py-2.5 font-semibold text-slate-800">{st.kelas}</td>
                       <td className="px-3 py-2.5 font-mono font-bold text-emerald-800 tabular-nums">
                         {st.nomorPeserta || '-'}
+                      </td>
+                      <td className="px-3 py-2.5 font-mono tabular-nums">
+                        {st.usernameUjian ? (
+                          <div className="leading-tight">
+                            <div className="font-bold text-slate-900">{st.usernameUjian}</div>
+                            <div className="text-[11px] text-slate-500">
+                              Pass: {st.passwordUjian || '-'}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">-</span>
+                        )}
                       </td>
                       {examConfig.moda === 'online' && (
                         <td className="px-3 py-2.5 text-center font-semibold tabular-nums">
@@ -690,6 +1202,39 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono"
                 />
               </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">User Login Ujian</label>
+                <input
+                  value={editingStudent.usernameUjian || ''}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, usernameUjian: e.target.value })}
+                  placeholder="Contoh: 2601001"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Password Login Ujian</label>
+                <div className="flex gap-1.5">
+                  <input
+                    value={editingStudent.passwordUjian || ''}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, passwordUjian: e.target.value })}
+                    placeholder="Contoh: A7K9M2"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditingStudent({
+                        ...editingStudent,
+                        passwordUjian: createReadablePassword(credPassLength),
+                      })
+                    }
+                    className="px-2.5 py-2 border border-slate-300 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 shrink-0 cursor-pointer"
+                    title="Acak Password Baru"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
             </div>
             <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
               <button
@@ -733,6 +1278,102 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Generate Exam Login Credentials Modal */}
+      {showCredModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+          <form
+            onSubmit={handleGenerateCredentials}
+            className="bg-white rounded-xl border border-slate-200 max-w-md w-full p-5 space-y-4 text-xs"
+          >
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-emerald-700" />
+                <h3 className="text-sm font-bold text-slate-900">Generate User &amp; Password Ujian</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCredModal(false)}
+                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-slate-600 leading-relaxed">
+              Membuat akun login unik untuk seluruh peserta aktif ({credValidation.totalActive} peserta) yang ditampilkan pada Kartu Peserta, DNPU, dan Label Meja.
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Basis Username Ujian</label>
+                <select
+                  value={credBasis}
+                  onChange={(e) => setCredBasis(e.target.value as typeof credBasis)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-semibold"
+                >
+                  <option value="nomor_peserta">Nomor Peserta (tanpa tanda pemisah)</option>
+                  <option value="nisn">NISN Peserta</option>
+                  <option value="nis">NIS Peserta</option>
+                  <option value="kode_urut">Kode Urut Otomatis (P001, P002, dst.)</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Prefix Tambahan (Opsional)</label>
+                  <input
+                    value={credPrefix}
+                    onChange={(e) => setCredPrefix(e.target.value.toUpperCase())}
+                    placeholder="Contoh: U26-"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Panjang Password</label>
+                  <select
+                    value={credPassLength}
+                    onChange={(e) => setCredPassLength(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-semibold"
+                  >
+                    <option value={6}>6 Karakter (Standar)</option>
+                    <option value={8}>8 Karakter (Panjang)</option>
+                  </select>
+                </div>
+              </div>
+
+              <label className="flex items-start gap-2 font-semibold text-slate-700 cursor-pointer pt-1">
+                <input
+                  type="checkbox"
+                  checked={credOverwrite}
+                  onChange={(e) => setCredOverwrite(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  Buat ulang semua akun peserta aktif (jika tidak dicentang, hanya mengisi peserta yang belum punya User &amp; Password)
+                </span>
+              </label>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={() => setShowCredModal(false)}
+                className="px-4 py-2 font-semibold text-slate-700 bg-slate-100 rounded-lg cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={isGeneratingCreds}
+                className="px-4 py-2 font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-lg cursor-pointer disabled:opacity-50"
+              >
+                {isGeneratingCreds ? 'Memproses...' : 'Generate & Simpan'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

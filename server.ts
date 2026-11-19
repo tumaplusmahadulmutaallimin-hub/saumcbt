@@ -116,38 +116,13 @@ function createInitialDbState(): SaumDatabaseState {
     supervisors: INITIAL_SUPERVISORS,
     supervisorAssignments: INITIAL_SUPERVISOR_ASSIGNMENTS,
     numberingConfig: INITIAL_NUMBERING_CONFIG,
-    numberingHistory: [
-      {
-        id: 'nh-init',
-        timestamp: '2026-05-10T08:00:00.000Z',
-        actor: 'Muhammad Irfan, S.Kom.',
-        totalGenerated: INITIAL_STUDENTS.length,
-        formatPreview: '26-01-10-001',
-        note: 'Penomoran awal data peserta',
-      },
-    ],
+    numberingHistory: [],
     roomConfig: INITIAL_ROOM_CONFIG,
     paperPresets: INITIAL_PAPER_PRESETS,
     sealConfigs: INITIAL_SEAL_CONFIGS,
     tataTertibDocs: INITIAL_TATA_TERTIB,
     phoneRecords: INITIAL_PHONE_RECORDS,
-    hpLogs: [
-      {
-        id: 'hpl-init-1',
-        hpId: 'hp-1',
-        kodeHp: 'HP-001',
-        namaSantri: 'Abdullah Azzam Ramadhan',
-        kelas: 'X-A',
-        kategori: 'Titipan',
-        jenisTransaksi: 'Penerimaan',
-        tanggal: '2026-05-17',
-        jam: '16:30',
-        petugas: 'Dedi Sutisna, S.Pd.I.',
-        penerimaAtauPenyetor: 'H. Rahmat (Wali Santri)',
-        jumlahFisik: 1,
-        kondisi: 'Baik',
-      },
-    ],
+    hpLogs: [],
     uploadedDocuments: INITIAL_UPLOADED_DOCUMENTS,
     rekapConfig: INITIAL_REKAP_CONFIG,
     archives: INITIAL_ARCHIVES,
@@ -156,14 +131,23 @@ function createInitialDbState(): SaumDatabaseState {
       {
         id: 'log-init',
         timestamp: new Date().toISOString(),
-        actor: 'Sistem SAUM',
+        actor: 'Arif Syaifudin, S.H',
         role: 'Super Admin',
         module: 'system',
         action: 'INIT_DATABASE',
-        detail: 'Inisialisasi basis data SAUM dengan 44 peserta, 2 ruang, 2 sesi, dan 6 ruang kelas fisik.',
+        detail: 'Inisialisasi basis data SAUM bersih siap input data madrasah.',
       },
     ],
   };
+}
+
+function mergePaperPresets(defaults: PaperPreset[], existing?: PaperPreset[]): PaperPreset[] {
+  if (!Array.isArray(existing) || existing.length === 0) return defaults;
+  const byId = new Map(existing.map((p) => [p.id, p]));
+  return defaults.map((d) => {
+    const saved = byId.get(d.id);
+    return saved ? { ...d, ...saved } : d;
+  });
 }
 
 function loadDb(): SaumDatabaseState {
@@ -180,6 +164,7 @@ function loadDb(): SaumDatabaseState {
     return {
       ...defaults,
       ...parsed,
+      paperPresets: mergePaperPresets(defaults.paperPresets, parsed.paperPresets),
       rekapConfig: {
         ...defaults.rekapConfig,
         ...(parsed.rekapConfig || {}),
@@ -316,11 +301,13 @@ function validateStudentsIntegrity(students: Student[]): string | null {
   const seenNisn = new Set<string>();
   const seenNis = new Set<string>();
   const seenNomor = new Set<string>();
+  const seenExamUsers = new Set<string>();
 
   for (const s of students) {
     const nisn = (s.nisn || '').trim();
     const nis = (s.nis || '').trim();
     const nomor = (s.nomorPeserta || '').trim();
+    const examUser = (s.usernameUjian || '').trim().toUpperCase();
 
     if (nisn) {
       if (seenNisn.has(nisn)) return `NISN ganda terdeteksi: ${nisn}`;
@@ -333,6 +320,10 @@ function validateStudentsIntegrity(students: Student[]): string | null {
     if (s.status === 'Aktif' && nomor) {
       if (seenNomor.has(nomor)) return `Nomor peserta ganda terdeteksi: ${nomor}`;
       seenNomor.add(nomor);
+    }
+    if (s.status === 'Aktif' && examUser) {
+      if (seenExamUsers.has(examUser)) return `Username ujian ganda terdeteksi: ${s.usernameUjian}`;
+      seenExamUsers.add(examUser);
     }
   }
   return null;
@@ -1077,6 +1068,20 @@ async function startServer() {
     appendAudit(restored, req.currentUser!, 'arsip', 'RESTORE_JSON_BACKUP', 'Melakukan pemulihan penuh dari file cadangan JSON.');
     saveDb(restored);
     res.json(restored);
+  });
+
+  // Reset Data Bersih (Hanya Super Admin)
+  app.post('/api/reset-clean', requireAuth, (req: AuthedRequest, res) => {
+    if (!canRoleRestoreBackup(req.currentUser!.role)) {
+      res.status(403).json({ error: 'Hanya Super Admin yang dapat melakukan reset data bersih.' });
+      return;
+    }
+    const current = loadDb();
+    createBackup(current, 'before-reset-clean');
+    const fresh = createInitialDbState();
+    appendAudit(fresh, req.currentUser!, 'pengaturan', 'RESET_CLEAN_DATA', 'Mereset seluruh data ujian ke kondisi bersih tanpa data dummy.');
+    saveDb(fresh);
+    res.json(fresh);
   });
 
   // Vite dev middleware or static serving in production

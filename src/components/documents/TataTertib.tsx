@@ -2,6 +2,7 @@ import React from 'react';
 import { MadrasahProfile, PaperPreset, TataTertibDoc } from '../../types';
 import { KopSurat } from './KopSurat';
 import { formatIndonesianDate } from '../../utils/qrBarcode';
+import { getSheetScreenStyle } from '../../utils/printLayout';
 
 interface TataTertibProps {
   profile: MadrasahProfile;
@@ -24,19 +25,32 @@ export const TataTertib: React.FC<TataTertibProps> = ({
     return [];
   })();
 
-  const isF4 = (doc?: TataTertibDoc) => (doc?.paperSize || paperPreset?.size) === 'F4';
+  if (docsToRender.length === 0) {
+    return (
+      <div className="p-8 text-center bg-white rounded-xl border border-slate-200">
+        <p className="text-slate-500 font-medium">Belum ada dokumen Tata Tertib yang tersedia.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full flex flex-col items-center">
       {docsToRender.map((doc) => {
-        const sheetClass = isF4(doc) ? 'w-[215mm] min-h-[330mm]' : 'w-[210mm] min-h-[297mm]';
-        const margin = doc.marginMm || paperPreset?.marginTopMm || 12;
+        const effectivePreset: Partial<PaperPreset> = {
+          ...paperPreset,
+          size: paperPreset?.size || doc.paperSize || 'A4',
+          marginTopMm: paperPreset?.marginTopMm ?? doc.marginMm ?? 10,
+          marginRightMm: paperPreset?.marginRightMm ?? doc.marginMm ?? 10,
+          marginBottomMm: paperPreset?.marginBottomMm ?? doc.marginMm ?? 10,
+          marginLeftMm: paperPreset?.marginLeftMm ?? doc.marginMm ?? 10,
+        };
+        const sheetStyle = getSheetScreenStyle(effectivePreset);
 
         return (
           <div
             key={doc.id}
-            style={{ padding: `${margin}mm` }}
-            className={`${sheetClass} bg-white text-slate-900 border border-slate-300 shadow-sm print:border-none print:shadow-none print:p-0 print-page-break mb-8 print:mb-0 text-[11px] leading-relaxed`}
+            style={sheetStyle}
+            className="saum-sheet border border-slate-300 shadow-sm print-page-break mb-8 print:mb-0 text-[11px] leading-relaxed"
           >
             {(paperPreset?.showKop ?? true) && <KopSurat profile={profile} />}
 
@@ -45,7 +59,8 @@ export const TataTertib: React.FC<TataTertibProps> = ({
                 {doc.title}
               </h2>
               <p className="text-xs font-semibold uppercase mt-0.5">
-                {profile.jenisUjian.toUpperCase()} • TAHUN PELAJARAN {profile.tahunPelajaran}
+                {(profile.jenisUjian || 'UJIAN MADRASAH').toUpperCase()} • TAHUN PELAJARAN{' '}
+                {profile.tahunPelajaran || '-'}
               </p>
               {doc.sourceFileName && (
                 <p className="text-[9.5px] text-slate-400 no-print mt-0.5">
@@ -54,7 +69,6 @@ export const TataTertib: React.FC<TataTertibProps> = ({
               )}
             </div>
 
-            {/* Render lines verbatim without altering wording */}
             <div className="space-y-2 text-justify mt-4 font-serif whitespace-pre-wrap">
               {doc.contentLines.map((line, i) => (
                 <p key={i} className="leading-relaxed text-slate-900">
@@ -66,11 +80,14 @@ export const TataTertib: React.FC<TataTertibProps> = ({
             <div className="mt-8 flex justify-end text-xs font-serif">
               <div className="text-center w-56 leading-tight">
                 <p>
-                  {profile.tempatTandaTangan}, {formatIndonesianDate(profile.tanggalSurat)}
+                  {profile.tempatTandaTangan ? `${profile.tempatTandaTangan}, ` : ''}
+                  {formatIndonesianDate(profile.tanggalSurat)}
                 </p>
                 <p className="font-bold">Kepala Madrasah,</p>
                 <div className="h-14" />
-                <p className="font-bold underline uppercase">{profile.namaKepala}</p>
+                <p className="font-bold underline uppercase">
+                  {profile.namaKepala || '.........................'}
+                </p>
                 <p className="text-[10px] font-sans">NIP. {profile.nipKepala || '-'}</p>
               </div>
             </div>

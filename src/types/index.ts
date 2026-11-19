@@ -51,6 +51,12 @@ export interface MadrasahProfile {
   kopMarginTopMm?: number;
   kopMarginBottomMm?: number;
   useOriginalKopImage?: boolean;
+  kopBaris1?: string; // Baris 1 KOP, mis. KEMENTERIAN AGAMA REPUBLIK INDONESIA
+  kopBaris2?: string; // Baris 2 KOP, mis. KANTOR KEMENTERIAN AGAMA KAB. ...
+  kopBaris3?: string; // Baris 3 KOP opsional (Yayasan / Unit)
+  showLogoKemenag?: boolean;
+  showLogoMadrasah?: boolean;
+  kopLogoSizePx?: number;
 }
 
 export interface ExamConfig {
@@ -74,7 +80,17 @@ export interface ExamConfig {
 }
 
 export interface PaperPreset {
-  id: 'denah_lokasi' | 'denah_duduk' | 'daftar_hadir' | 'label_ruang' | 'berita_acara' | 'segel' | 'dokumen_hp' | 'default';
+  id:
+    | 'denah_lokasi'
+    | 'denah_duduk'
+    | 'daftar_hadir'
+    | 'label_ruang'
+    | 'berita_acara'
+    | 'segel'
+    | 'dokumen_hp'
+    | 'kartu_peserta'
+    | 'nomor_meja'
+    | 'default';
   label: string;
   size: PaperSize;
   orientation: PaperOrientation;
@@ -82,6 +98,8 @@ export interface PaperPreset {
   marginBottomMm: number;
   marginLeftMm: number;
   marginRightMm: number;
+  scalePercent?: number;
+  cardsPerPage?: 4 | 6;
   fontSizePt: number;
   lineHeight: number;
   showKop: boolean;
@@ -103,6 +121,8 @@ export interface Student {
   sesi?: number; // 1, 2, ... (for online mode)
   ruangId?: string;
   nomorMeja?: number;
+  usernameUjian?: string; // Username login ruang ujian (CBT/Online)
+  passwordUjian?: string; // Password login ruang ujian (CBT/Online)
   fotoUrl?: string;
   barcodeUrl?: string; // Uploaded barcode/QR image specifically for this student
   customLink?: string; // Optional manual URL link for this student
@@ -203,6 +223,9 @@ export interface NumberingConfig {
   uploadedBarcodeUrl?: string; // Global uploaded barcode image
   manualLinkUrl?: string; // Manual link URL written by operator
   showDeskNumber?: boolean;
+  userBasis?: 'nomor_peserta' | 'nisn' | 'nis' | 'kode_urut';
+  userPrefix?: string;
+  passwordLength?: number;
 }
 
 export interface NumberingHistoryEntry {

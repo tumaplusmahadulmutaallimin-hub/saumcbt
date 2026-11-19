@@ -13,6 +13,7 @@ import {
 import { KopSurat } from './KopSurat';
 import { formatDayAndDate, formatIndonesianDate } from '../../utils/qrBarcode';
 import { computeClassRangesInRoom } from '../../utils/seating';
+import { getSheetScreenStyle } from '../../utils/printLayout';
 
 interface BeritaAcaraProps {
   profile: MadrasahProfile;
@@ -52,8 +53,17 @@ export const BeritaAcara: React.FC<BeritaAcaraProps> = ({
   );
 
   const isOnline = examConfig?.moda === 'online';
-  const isF4 = paperPreset?.size === 'F4';
-  const sheetClass = isF4 ? 'w-[215mm] min-h-[330mm]' : 'w-[210mm] min-h-[297mm]';
+  const sheetStyle = getSheetScreenStyle(paperPreset);
+
+  if (activeRooms.length === 0 || activeSchedules.length === 0) {
+    return (
+      <div className="p-8 text-center bg-white rounded-xl border border-slate-200">
+        <p className="text-slate-500 font-medium">
+          Data Ruang Ujian atau Jadwal Ujian belum tersedia untuk mencetak Berita Acara.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full flex flex-col items-center">
@@ -81,7 +91,8 @@ export const BeritaAcara: React.FC<BeritaAcaraProps> = ({
           return (
             <div
               key={`ba-${room.id}-${schedule.id}`}
-              className={`${sheetClass} p-[10mm] bg-white text-slate-900 border border-slate-300 shadow-sm print:border-none print:shadow-none print:p-0 print-page-break mb-8 print:mb-0 text-[11px] leading-relaxed`}
+              style={sheetStyle}
+              className="saum-sheet border border-slate-300 shadow-sm print-page-break mb-8 print:mb-0 text-[11px] leading-relaxed"
             >
               {(paperPreset?.showKop ?? true) && <KopSurat profile={profile} isCompact />}
 
@@ -234,7 +245,8 @@ export const BeritaAcara: React.FC<BeritaAcaraProps> = ({
 
                   <div className="text-center w-52 leading-tight">
                     <p className="text-[10.5px]">
-                      {profile.tempatTandaTangan}, {formatIndonesianDate(schedule.tanggal)}
+                      {profile.tempatTandaTangan ? `${profile.tempatTandaTangan}, ` : ''}
+                      {formatIndonesianDate(schedule.tanggal)}
                     </p>
                     <p className="font-bold">Pengawas Ruang II,</p>
                     <div className="h-14" />
@@ -248,7 +260,7 @@ export const BeritaAcara: React.FC<BeritaAcaraProps> = ({
                 <div className="mt-3 text-center text-xs flex flex-col items-center">
                   <p className="font-bold">Mengetahui, Kepala Madrasah,</p>
                   <div className="h-12" />
-                  <p className="font-bold underline uppercase">{profile.namaKepala}</p>
+                  <p className="font-bold underline uppercase">{profile.namaKepala || '.........................'}</p>
                   <p className="text-[9.5px] font-sans">NIP. {profile.nipKepala || '-'}</p>
                 </div>
               </div>

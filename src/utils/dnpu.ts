@@ -9,6 +9,8 @@ export interface DnpuHeaderMapping {
   kelas: string;
   tempatLahir?: string;
   tanggalLahir?: string;
+  usernameUjian?: string;
+  passwordUjian?: string;
 }
 
 export interface DnpuValidationRow {
@@ -21,6 +23,8 @@ export interface DnpuValidationRow {
   kelas: string;
   tempatLahir: string;
   tanggalLahir: string;
+  usernameUjian?: string;
+  passwordUjian?: string;
   errors: string[];
   warnings: string[];
   isValid: boolean;
@@ -108,6 +112,8 @@ export function detectHeaderMapping(headers: string[]): DnpuHeaderMapping {
     kelas: findMatch(['KELAS', 'ROMBEL', 'TINGKAT']) || headers[4] || '',
     tempatLahir: findMatch(['TEMPAT LAHIR', 'TMP LAHIR']),
     tanggalLahir: findMatch(['TANGGAL LAHIR', 'TGL LAHIR']),
+    usernameUjian: findMatch(['USER UJIAN', 'USERNAME UJIAN', 'USERNAME', 'USER']),
+    passwordUjian: findMatch(['PASSWORD UJIAN', 'PASSWORD', 'PASS UJIAN', 'PASS']),
   };
 }
 
@@ -154,6 +160,8 @@ export function validateDnpuRows(
     const kelas = (row[mapping.kelas] || '').trim().toUpperCase();
     const tempatLahir = mapping.tempatLahir ? (row[mapping.tempatLahir] || '').trim() : '';
     const tanggalLahir = mapping.tanggalLahir ? (row[mapping.tanggalLahir] || '').trim() : '';
+    const usernameUjian = mapping.usernameUjian ? (row[mapping.usernameUjian] || '').trim() : '';
+    const passwordUjian = mapping.passwordUjian ? (row[mapping.passwordUjian] || '').trim() : '';
 
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -216,6 +224,8 @@ export function validateDnpuRows(
       kelas,
       tempatLahir,
       tanggalLahir,
+      usernameUjian,
+      passwordUjian,
       errors,
       warnings,
       isValid: errors.length === 0,
@@ -240,6 +250,8 @@ export function revalidateEditedDnpuRows(
     KELAS: r.kelas,
     TEMPAT_LAHIR: r.tempatLahir,
     TANGGAL_LAHIR: r.tanggalLahir,
+    USER_UJIAN: r.usernameUjian || '',
+    PASSWORD_UJIAN: r.passwordUjian || '',
   }));
 
   const validated = validateDnpuRows(
@@ -252,6 +264,8 @@ export function revalidateEditedDnpuRows(
       kelas: 'KELAS',
       tempatLahir: 'TEMPAT_LAHIR',
       tanggalLahir: 'TANGGAL_LAHIR',
+      usernameUjian: 'USER_UJIAN',
+      passwordUjian: 'PASSWORD_UJIAN',
     },
     registeredClasses,
     existingStudents,
@@ -300,8 +314,35 @@ export function downloadDnpuExcelTemplate(): void {
  */
 export function exportStudentsToExcel(students: Student[], includeSesi: boolean, filename = 'Data_DNPU_SAUM.xlsx'): void {
   const headers = includeSesi
-    ? ['No', 'NISN', 'NIS', 'Nama Lengkap', 'JK', 'Kelas', 'Nomor Peserta', 'Sesi', 'Ruang', 'Meja', 'Status']
-    : ['No', 'NISN', 'NIS', 'Nama Lengkap', 'JK', 'Kelas', 'Nomor Peserta', 'Ruang', 'Meja', 'Status'];
+    ? [
+        'No',
+        'NISN',
+        'NIS',
+        'Nama Lengkap',
+        'JK',
+        'Kelas',
+        'Nomor Peserta',
+        'User Ujian',
+        'Password Ujian',
+        'Sesi',
+        'Ruang',
+        'Meja',
+        'Status',
+      ]
+    : [
+        'No',
+        'NISN',
+        'NIS',
+        'Nama Lengkap',
+        'JK',
+        'Kelas',
+        'Nomor Peserta',
+        'User Ujian',
+        'Password Ujian',
+        'Ruang',
+        'Meja',
+        'Status',
+      ];
 
   const aoa: (string | number)[][] = [headers];
 
@@ -315,6 +356,8 @@ export function exportStudentsToExcel(students: Student[], includeSesi: boolean,
         s.jenisKelamin,
         s.kelas || '',
         s.nomorPeserta || '',
+        s.usernameUjian || '',
+        s.passwordUjian || '',
         s.sesi || '',
         s.ruangId || '',
         s.nomorMeja || '',
@@ -329,6 +372,8 @@ export function exportStudentsToExcel(students: Student[], includeSesi: boolean,
         s.jenisKelamin,
         s.kelas || '',
         s.nomorPeserta || '',
+        s.usernameUjian || '',
+        s.passwordUjian || '',
         s.ruangId || '',
         s.nomorMeja || '',
         s.status,
@@ -338,7 +383,7 @@ export function exportStudentsToExcel(students: Student[], includeSesi: boolean,
 
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   for (let r = 1; r < aoa.length; r++) {
-    [1, 2, 6].forEach((c) => {
+    [1, 2, 6, 7, 8].forEach((c) => {
       const cell = ws[XLSX.utils.encode_cell({ r, c })];
       if (cell) {
         cell.t = 's';
@@ -354,6 +399,8 @@ export function exportStudentsToExcel(students: Student[], includeSesi: boolean,
     { wch: 5 },
     { wch: 10 },
     { wch: 16 },
+    { wch: 18 },
+    { wch: 14 },
     { wch: 10 },
     { wch: 10 },
     { wch: 8 },

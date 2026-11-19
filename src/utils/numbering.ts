@@ -179,3 +179,164 @@ export function validateParticipantNumbers(students: Student[]): {
     totalActive: activeStudents.length,
   };
 }
+
+const READABLE_PASSWORD_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+export function createReadablePassword(length = 6): string {
+  const safeLen = Math.max(4, Math.min(12, length));
+  let result = '';
+  const cryptoObj = typeof globalThis !== 'undefined' ? (globalThis as { crypto?: Crypto }).crypto : undefined;
+
+  if (cryptoObj && typeof cryptoObj.getRandomValues === 'function') {
+    const arr = new Uint32Array(safeLen);
+    cryptoObj.getRandomValues(arr);
+    for (let i = 0; i < safeLen; i++) {
+      result += READABLE_PASSWORD_CHARS[arr[i] % READABLE_PASSWORD_CHARS.length];
+    }
+    return result;
+  }
+
+  for (let i = 0; i < safeLen; i++) {
+    const idx = Math.floor(Math.random() * READABLE_PASSWORD_CHARS.length);
+    result += READABLE_PASSWORD_CHARS[idx];
+  }
+  return result;
+}
+
+export interface GenerateCredentialOptions {
+  basis?: 'nomor_peserta' | 'nisn' | 'nis' | 'kode_urut';
+  prefix?: string;
+  passwordLength?: number;
+  overwriteExisting?: boolean;
+  sortBy?: NumberingConfig['urutBerdasarkan'];
+  urutanKelas?: string[];
+}
+
+/**
+ * Generate unique Username Ujian & Password Ujian for all active students
+ * used to log into CBT / Online exam rooms.
+ */
+export function generateExamCredentials(
+  students: Student[],
+  options: GenerateCredentialOptions = {}
+): Student[] {
+  const basis = options.basis || 'nomor_peserta';
+  const prefix = (options.prefix || '').trim().replace(/\s+/g, '');
+  const passwordLength = options.passwordLength ?? 6;
+  const overwriteExisting = options.overwriteExisting ?? true;
+  const sortBy = options.sortBy || 'kelas_lalu_nama';
+
+  const sorted = sortStudentsForNumbering(students, sortBy, options.urutanKelas);
+  const usedUsernames = new Set<string>();
+
+  // Reserve existing usernames that won't be overwritten
+  if (!overwriteExisting) {
+    for (const st of sorted) {
+      if (st.status === 'Aktif' && st.usernameUjian?.trim()) {
+        usedUsernames.add(st.usernameUjian.trim().toUpperCase());
+      }
+    }
+  }
+
+  const credMap = new Map<string, { usernameUjian: string; passwordUjian: string }>();
+  let seq = 1;
+
+  for (const st of sorted) {
+    if (st.status !== 'Aktif') {
+      credMap.set(st.id, { usernameUjian: '', passwordUjian: '' });
+      continue;
+    }
+
+    const existingUser = (st.usernameUjian || '').trim();
+    const existingPass = (st.passwordUjian || '').trim();
+
+    if (!overwriteExisting && existingUser && existingPass) {
+      credMap.set(st.id, { usernameUjian: existingUser, passwordUjian: existingPass });
+      seq++;
+      continue;
+    }
+
+    let candidateUser = existingUser;
+    if (overwriteExisting || !candidateUser) {
+      let base = '';
+      if (basis === 'nisn' && st.nisn?.trim()) {
+        base = st.nisn.trim();
+      } else if (basis === 'nis' && st.nis?.trim()) {
+        base = st.nis.trim();
+      } else if (basis === 'nomor_peserta' && st.nomorPeserta?.trim()) {
+        base = st.nomorPeserta.trim().replace(/[^A-Za-z0-9]/g, '');
+      }
+
+      if (!base) {
+        base = `P${String(seq).padStart(3, '0')}`;
+      }
+
+      const rawCandidate = `${prefix}${base}`.toUpperCase();
+      let uniqueCandidate = rawCandidate;
+      let suffix = 2;
+      while (usedUsernames.has(uniqueCandidate)) {
+        uniqueCandidate = `${rawCandidate}-${suffix}`;
+        suffix++;
+      }
+      candidateUser = uniqueCandidate;
+    }
+
+    usedUsernames.add(candidateUser.toUpperCase());
+
+    const finalPass =
+      !overwriteExisting && existingPass ? existingPass : createReadablePassword(passwordLength);
+
+    credMap.set(st.id, {
+      usernameUjian: candidateUser,
+      passwordUjian: finalPass,
+    });
+    seq++;
+  }
+
+  return students.map((st) => {
+    const cred = credMap.get(st.id);
+    if (!cred) return st;
+    return {
+      ...st,
+      usernameUjian: cred.usernameUjian,
+      passwordUjian: cred.passwordUjian,
+    };
+  });
+}
+
+/**
+ * Validate exam credentials completeness & uniqueness across active students.
+ */
+export function validateExamCredentials(students: Student[]): {
+  isValid: boolean;
+  duplicates: string[];
+  missingCount: number;
+  totalActive: number;
+} {
+  const activeStudents = students.filter((s) => s.status === 'Aktif');
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  let missingCount = 0;
+
+  for (const s of activeStudents) {
+    const u = (s.usernameUjian || '').trim().toUpperCase();
+    const p = (s.passwordUjian || '').trim();
+    if (!u || !p) {
+      missingCount++;
+      continue;
+    }
+    if (seen.has(u)) {
+      duplicates.add(u);
+    } else {
+      seen.add(u);
+    }
+  }
+
+  return {
+    isValid: duplicates.size === 0 && missingCount === 0,
+    duplicates: Array.from(duplicates),
+    missingCount,
+    totalActive: activeStudents.length,
+  };
+}
+

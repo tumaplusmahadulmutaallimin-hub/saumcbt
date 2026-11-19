@@ -16,6 +16,7 @@ import {
   computeRoomDuplicationBreakdown,
   computeRoomEquipmentRows,
 } from '../../utils/rekap';
+import { getSheetScreenStyle } from '../../utils/printLayout';
 
 export { computeRoomDuplicationBreakdown };
 
@@ -84,15 +85,16 @@ export const RekapKebutuhanCetak: React.FC<RekapKebutuhanCetakProps> = ({
 
   const grandTotalSoal = duplicationRows.reduce((s, d) => s + d.totalSoal, 0);
   const grandTotalLjk = duplicationRows.reduce((s, d) => s + d.totalLjk, 0);
-  const paperWidthClass = paperPreset?.orientation === 'landscape' ? 'w-[297mm]' : 'w-[210mm]';
+  const sheetStyle = getSheetScreenStyle(paperPreset);
 
   return (
     <div className="w-full flex flex-col items-center">
       {/* Halaman 1: Rekap Perlengkapan Ruang & Kebutuhan Sarpras */}
       <div
-        className={`${paperWidthClass} min-h-[297mm] p-[10mm] bg-white text-slate-900 border border-slate-300 shadow-sm print:border-none print:shadow-none print:p-0 print-page-break mb-8 print:mb-0 text-[10.5px] leading-relaxed`}
+        style={sheetStyle}
+        className="saum-sheet border border-slate-300 shadow-sm print-page-break mb-8 print:mb-0 text-[10.5px] leading-relaxed"
       >
-        <KopSurat profile={profile} />
+        {(paperPreset?.showKop ?? true) && <KopSurat profile={profile} />}
 
         <div className="text-center my-3">
           <h2 className="text-sm font-bold uppercase font-serif tracking-wide underline">
@@ -209,13 +211,16 @@ export const RekapKebutuhanCetak: React.FC<RekapKebutuhanCetakProps> = ({
           </div>
           <div className="text-center w-52 leading-tight">
             <p className="text-[11px]">
-              {profile.tempatTandaTangan}, {formatIndonesianDate(profile.tanggalSurat || '2026-03-23')}
+              {profile.tempatTandaTangan ? `${profile.tempatTandaTangan}, ` : ''}
+              {formatIndonesianDate(profile.tanggalSurat)}
             </p>
             <p className="font-bold">Kepala Madrasah,</p>
             <div className="h-14 flex items-center justify-center">
               <span className="text-[9px] text-slate-300 italic font-sans">( Tanda Tangan & Cap )</span>
             </div>
-            <p className="font-bold underline uppercase text-slate-950">{profile.namaKepala}</p>
+            <p className="font-bold underline uppercase text-slate-950">
+              {profile.namaKepala || '.........................'}
+            </p>
             <p className="text-[9.5px] font-sans">NIP. {profile.nipKepala || '-'}</p>
           </div>
         </div>
@@ -223,9 +228,10 @@ export const RekapKebutuhanCetak: React.FC<RekapKebutuhanCetakProps> = ({
 
       {/* Halaman 2: Pemantauan Kebutuhan Penggandaan Soal & Dokumen per Ruang & Jadwal */}
       <div
-        className={`${paperWidthClass} min-h-[297mm] p-[10mm] bg-white text-slate-900 border border-slate-300 shadow-sm print:border-none print:shadow-none print:p-0 text-[10px] leading-relaxed`}
+        style={sheetStyle}
+        className="saum-sheet border border-slate-300 shadow-sm text-[10px] leading-relaxed"
       >
-        <KopSurat profile={profile} />
+        {(paperPreset?.showKop ?? true) && <KopSurat profile={profile} />}
         <div className="text-center my-3">
           <h2 className="text-sm font-bold uppercase font-serif tracking-wide underline">
             REKAPITULASI KEBUTUHAN PENGGANDAAN BERKAS & ADMINISTRASI RUANG

@@ -1,7 +1,8 @@
 import React from 'react';
-import { CommitteeMember, ExamRoom, MadrasahProfile, Supervisor } from '../../types';
+import { CommitteeMember, ExamRoom, MadrasahProfile, PaperPreset, Supervisor } from '../../types';
 import { KopSurat } from './KopSurat';
 import { formatIndonesianDate } from '../../utils/qrBarcode';
+import { getSheetScreenStyle } from '../../utils/printLayout';
 
 interface SKPanitiaProps {
   profile: MadrasahProfile;
@@ -9,6 +10,7 @@ interface SKPanitiaProps {
   supervisors: Supervisor[];
   rooms: ExamRoom[];
   selectedType: 'sk_panitia' | 'surat_tugas';
+  paperPreset?: PaperPreset;
 }
 
 export const SKPanitia: React.FC<SKPanitiaProps> = ({
@@ -17,15 +19,19 @@ export const SKPanitia: React.FC<SKPanitiaProps> = ({
   supervisors,
   rooms,
   selectedType,
+  paperPreset,
 }) => {
-  const roomMap = new Map(rooms.map((r) => [r.id, r]));
+  const sheetStyle = getSheetScreenStyle(paperPreset);
 
   // 1. SURAT KEPUTUSAN (SK) PANITIA
   if (selectedType === 'sk_panitia') {
     return (
       <div className="w-full flex flex-col items-center">
-        <div className="w-[210mm] min-h-[297mm] p-[12mm] bg-white text-slate-900 border border-slate-300 shadow-sm print:border-none print:shadow-none print:p-0 print-page-break mb-8 print:mb-0 text-[11px] leading-relaxed">
-          <KopSurat profile={profile} />
+        <div
+          style={sheetStyle}
+          className="saum-sheet border border-slate-300 shadow-sm print-page-break mb-8 print:mb-0 text-[11px] leading-relaxed"
+        >
+          {(paperPreset?.showKop ?? true) && <KopSurat profile={profile} />}
 
           <div className="text-center my-3">
             <h2 className="text-xs font-bold uppercase font-serif tracking-wider">
@@ -119,14 +125,16 @@ export const SKPanitia: React.FC<SKPanitiaProps> = ({
           <div className="mt-6 flex justify-end text-xs font-serif">
             <div className="text-center w-56 leading-tight">
               <p>
-                Ditetapkan di: {profile.tempatTandaTangan}
-                <br />Pada tanggal: {formatIndonesianDate(profile.tanggalSurat || '2026-03-23')}
+                Ditetapkan di: {profile.tempatTandaTangan || '..................'}
+                <br />Pada tanggal: {formatIndonesianDate(profile.tanggalSurat)}
               </p>
               <p className="font-bold mt-1">Kepala Madrasah,</p>
               <div className="h-14 flex items-center justify-center">
                 <span className="text-[9px] text-slate-300 italic font-sans">( Tanda Tangan & Cap )</span>
               </div>
-              <p className="font-bold underline uppercase text-slate-950">{profile.namaKepala}</p>
+              <p className="font-bold underline uppercase text-slate-950">
+                {profile.namaKepala || '.........................'}
+              </p>
               <p className="text-[10px] font-sans">NIP. {profile.nipKepala || '-'}</p>
             </div>
           </div>
@@ -138,8 +146,11 @@ export const SKPanitia: React.FC<SKPanitiaProps> = ({
   // 2. SURAT TUGAS PENGAWAS RUANG
   return (
     <div className="w-full flex flex-col items-center">
-      <div className="w-[210mm] min-h-[297mm] p-[12mm] bg-white text-slate-900 border border-slate-300 shadow-sm print:border-none print:shadow-none print:p-0 print-page-break mb-8 print:mb-0 text-[11px] leading-relaxed">
-        <KopSurat profile={profile} />
+      <div
+        style={sheetStyle}
+        className="saum-sheet border border-slate-300 shadow-sm print-page-break mb-8 print:mb-0 text-[11px] leading-relaxed"
+      >
+        {(paperPreset?.showKop ?? true) && <KopSurat profile={profile} />}
 
         <div className="text-center my-4">
           <h2 className="text-sm font-bold uppercase font-serif tracking-wide underline">
@@ -196,13 +207,16 @@ export const SKPanitia: React.FC<SKPanitiaProps> = ({
         <div className="mt-8 flex justify-end text-xs font-serif">
           <div className="text-center w-56 leading-tight">
             <p>
-              {profile.tempatTandaTangan}, {formatIndonesianDate(profile.tanggalSurat || '2026-03-23')}
+              {profile.tempatTandaTangan ? `${profile.tempatTandaTangan}, ` : ''}
+              {formatIndonesianDate(profile.tanggalSurat)}
             </p>
             <p className="font-bold mt-1">Kepala Madrasah,</p>
             <div className="h-16 flex items-center justify-center">
               <span className="text-[10px] text-slate-300 italic font-sans">( Tanda Tangan & Cap )</span>
             </div>
-            <p className="font-bold underline uppercase text-slate-950">{profile.namaKepala}</p>
+            <p className="font-bold underline uppercase text-slate-950">
+              {profile.namaKepala || '.........................'}
+            </p>
             <p className="text-[10px] font-sans">NIP. {profile.nipKepala || '-'}</p>
           </div>
         </div>

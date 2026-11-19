@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Shuffle,
   DoorClosed,
@@ -51,6 +51,10 @@ export const RuangSesiView: React.FC<RuangSesiViewProps> = ({
   const [targetRoomId, setTargetRoomId] = useState('');
   const [targetSesi, setTargetSesi] = useState<number>(1);
 
+  useEffect(() => {
+    setLocalConfig(roomConfig);
+  }, [roomConfig]);
+
   const isOnline = examConfig.moda === 'online';
   const activeStudents = students.filter((s) => s.status === 'Aktif');
   const anyRoomLocked = rooms.some((r) => r.isLocked);
@@ -73,6 +77,11 @@ export const RuangSesiView: React.FC<RuangSesiViewProps> = ({
   }, [activeStudents, isOnline, examConfig.jumlahSesi]);
 
   const handleGenerateSessions = async () => {
+    if (activeStudents.length === 0) {
+      setWarnings(['Belum ada peserta aktif di DNPU. Tambahkan peserta terlebih dahulu sebelum membagi sesi.']);
+      return;
+    }
+    setWarnings([]);
     const updatedStudents = distributeSessions(students, examConfig.jumlahSesi);
     await onSaveRooms({
       students: updatedStudents,
@@ -85,6 +94,10 @@ export const RuangSesiView: React.FC<RuangSesiViewProps> = ({
   const handleGenerateRooms = async () => {
     if (anyRoomLocked) {
       setWarnings(['Sebagian ruang dikunci. Buka kunci ruang terlebih dahulu sebelum membagi ulang otomatis.']);
+      return;
+    }
+    if (activeStudents.length === 0) {
+      setWarnings(['Belum ada peserta aktif di DNPU. Tambahkan peserta di Data DNPU terlebih dahulu.']);
       return;
     }
     const res = distributeRoomsCrossJenjang(
@@ -256,7 +269,7 @@ export const RuangSesiView: React.FC<RuangSesiViewProps> = ({
               type="number"
               min={1}
               disabled={!canEdit}
-              value={localConfig.jumlahRuangManual || rooms.length}
+              value={localConfig.jumlahRuangManual || Math.max(1, rooms.length)}
               onChange={(e) =>
                 setLocalConfig({
                   ...localConfig,
@@ -270,6 +283,12 @@ export const RuangSesiView: React.FC<RuangSesiViewProps> = ({
       </div>
 
       {/* Room Cards Summary */}
+      {rooms.length === 0 ? (
+        <div className="bg-white p-8 rounded-xl border border-dashed border-slate-300 text-center text-xs text-slate-500">
+          Belum ada ruang ujian yang terbentuk. Masukkan peserta di <strong>Data DNPU</strong> lalu klik{' '}
+          <strong>Generate Pembagian Ruang</strong> untuk membuat daftar ruang otomatis.
+        </div>
+      ) : null}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {rooms.map((room) => {
           const roomStudents = activeStudents.filter((s) => s.ruangId === room.id);
@@ -327,7 +346,8 @@ export const RuangSesiView: React.FC<RuangSesiViewProps> = ({
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200 text-slate-600">
                       <th className="px-2 py-1.5 text-center w-10">Meja</th>
-                      <th className="px-2 py-1.5 text-left">Nama & No. Peserta</th>
+                      <th className="px-2 py-1.5 text-left">Nama &amp; No. Peserta</th>
+                      <th className="px-2 py-1.5 text-left">User &amp; Pass Ujian</th>
                       <th className="px-2 py-1.5 text-center">Kelas</th>
                       {isOnline && <th className="px-2 py-1.5 text-center">Sesi</th>}
                       {canEdit && <th className="px-2 py-1.5 text-right">Pindah</th>}
@@ -343,7 +363,17 @@ export const RuangSesiView: React.FC<RuangSesiViewProps> = ({
                           </td>
                           <td className="px-2 py-1.5">
                             <div className="font-semibold text-slate-900">{st.nama}</div>
-                            <div className="text-[11px] font-mono text-slate-500">{st.nomorPeserta}</div>
+                            <div className="text-[11px] font-mono text-slate-500">{st.nomorPeserta || '-'}</div>
+                          </td>
+                          <td className="px-2 py-1.5 font-mono">
+                            {st.usernameUjian ? (
+                              <div className="leading-tight">
+                                <div className="font-bold text-slate-900">{st.usernameUjian}</div>
+                                <div className="text-[10.5px] text-slate-500">P: {st.passwordUjian || '-'}</div>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">-</span>
+                            )}
                           </td>
                           <td className="px-2 py-1.5 text-center font-semibold">{st.kelas}</td>
                           {isOnline && <td className="px-2 py-1.5 text-center font-semibold">S{st.sesi || 1}</td>}

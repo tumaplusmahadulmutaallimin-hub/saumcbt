@@ -1,7 +1,17 @@
 import React from 'react';
-import { ExamConfig, ExamRoom, ExamSchedule, ExamSubject, MadrasahProfile, NumberingConfig, Student } from '../../types';
+import {
+  ExamConfig,
+  ExamRoom,
+  ExamSchedule,
+  ExamSubject,
+  MadrasahProfile,
+  NumberingConfig,
+  PaperPreset,
+  Student,
+} from '../../types';
 import { KopSurat } from './KopSurat';
 import { SimpleQRCode, formatDayAndDate, formatIndonesianDate } from '../../utils/qrBarcode';
+import { getCardGridMetrics, getSheetScreenStyle } from '../../utils/printLayout';
 
 interface LabelAdministrasiProps {
   profile: MadrasahProfile;
@@ -13,6 +23,7 @@ interface LabelAdministrasiProps {
   numberingConfig?: NumberingConfig;
   selectedSubtype: 'label_meja' | 'label_pintu' | 'label_amplop';
   selectedRoomId?: string;
+  paperPreset?: PaperPreset;
 }
 
 export const LabelAdministrasi: React.FC<LabelAdministrasiProps> = ({
@@ -25,21 +36,39 @@ export const LabelAdministrasi: React.FC<LabelAdministrasiProps> = ({
   numberingConfig,
   selectedSubtype,
   selectedRoomId,
+  paperPreset,
 }) => {
   const activeRooms = rooms.filter((r) => !selectedRoomId || selectedRoomId === 'all' || r.id === selectedRoomId);
   const roomMap = new Map(rooms.map((r) => [r.id, r]));
   const subjectMap = new Map(subjects.map((s) => [s.id, s]));
   const barcodeMode = numberingConfig?.barcodeMode || 'auto';
   const isOnline = examConfig?.moda === 'online';
+  const sheetStyle = getSheetScreenStyle(paperPreset);
 
-  // 1. LABEL MEJA (8 per page - Lengkap Data Peserta & Meja)
+  // 1. LABEL MEJA (6 kartu per halaman F4 = 2 kolom x 3 baris, atau mengikuti preset)
   if (selectedSubtype === 'label_meja') {
     let filteredStudents = students.filter((s) => s.status === 'Aktif');
     if (selectedRoomId && selectedRoomId !== 'all') {
       filteredStudents = filteredStudents.filter((s) => s.ruangId === selectedRoomId);
     }
 
-    const chunkSize = 8;
+    if (filteredStudents.length === 0) {
+      return (
+        <div className="p-8 text-center bg-white rounded-xl border border-slate-200">
+          <p className="text-slate-500 font-medium">
+            Belum ada peserta aktif untuk mencetak label nomor meja.
+          </p>
+        </div>
+      );
+    }
+
+    const metrics = getCardGridMetrics(paperPreset, {
+      defaultSize: 'F4',
+      defaultCardsPerPage: 6,
+      gapMm: 4,
+    });
+    const mejaSheetStyle = getSheetScreenStyle(metrics.resolved);
+    const chunkSize = metrics.cardsPerPage;
     const pages: Student[][] = [];
     for (let i = 0; i < filteredStudents.length; i += chunkSize) {
       pages.push(filteredStudents.slice(i, i + chunkSize));
@@ -50,11 +79,12 @@ export const LabelAdministrasi: React.FC<LabelAdministrasiProps> = ({
         {pages.map((pageStudents, pageIdx) => (
           <div
             key={pageIdx}
-            className={`w-[210mm] min-h-[297mm] p-[10mm] bg-white text-slate-900 border border-slate-300 shadow-sm print:border-none print:shadow-none print:p-0 ${
+            style={mejaSheetStyle}
+            className={`saum-sheet border border-slate-300 shadow-sm ${
               pageIdx < pages.length - 1 ? 'print-page-break mb-8 print:mb-0' : ''
             }`}
           >
-            <div className="grid grid-cols-2 gap-[4.5mm]">
+            <div className="grid grid-cols-2 gap-[4mm]">
               {pageStudents.map((st) => {
                 const room = st.ruangId ? roomMap.get(st.ruangId) : undefined;
                 const uploadedBarcode = st.barcodeUrl || numberingConfig?.uploadedBarcodeUrl;
@@ -63,8 +93,8 @@ export const LabelAdministrasi: React.FC<LabelAdministrasiProps> = ({
                 return (
                   <div
                     key={st.id}
-                    className="border-2 border-dashed border-slate-800 rounded-lg p-2.5 bg-white flex flex-col justify-between"
-                    style={{ minHeight: '64mm' }}
+                    className="border-2 border-dashed border-slate-800 rounded-lg p-3 bg-white flex flex-col justify-between print-avoid-break overflow-hidden"
+                    style={{ height: `${metrics.cardHeightMm}mm` }}
                   >
                     <div className="border-b-2 border-emerald-800 pb-1 flex items-center justify-between gap-2">
                       <div className="min-w-0">
@@ -98,6 +128,9 @@ export const LabelAdministrasi: React.FC<LabelAdministrasiProps> = ({
                             {room ? room.namaRuang : '-'}
                             {isOnline || st.sesi ? ` / Sesi ${st.sesi || 1}` : ''}
                           </span>
+                        </p>
+                        <p className="text-[8px] font-mono text-slate-900 truncate">
+                          User: <b>{st.usernameUjian || '-'}</b> &bull; Pass: <b>{st.passwordUjian || '-'}</b>
                         </p>
                         {effectiveLink && (
                           <p className="text-[7.5px] font-mono text-blue-900 truncate">
@@ -141,6 +174,13 @@ export const LabelAdministrasi: React.FC<LabelAdministrasiProps> = ({
 
   // 2. LABEL PINTU RUANG
   if (selectedSubtype === 'label_pintu') {
+    if (activeRooms.length === 0) {
+      return (
+        <div className="p-8 text-center bg-white rounded-xl border border-slate-200">
+          <p className="text-slate-500 font-medium">Belum ada ruang ujian yang dapat dicetak label pintunya.</p>
+        </div>
+      );
+    }
     return (
       <div className="w-full flex flex-col items-center">
         {activeRooms.map((room) => {
@@ -154,9 +194,10 @@ export const LabelAdministrasi: React.FC<LabelAdministrasiProps> = ({
           return (
             <div
               key={`pintu-${room.id}`}
-              className="w-[210mm] min-h-[297mm] p-[12mm] bg-white text-slate-900 border border-slate-300 shadow-sm print:border-none print:shadow-none print:p-0 print-page-break mb-8 print:mb-0 flex flex-col justify-between"
+              style={sheetStyle}
+              className="saum-sheet border border-slate-300 shadow-sm print-page-break mb-8 print:mb-0 flex flex-col justify-between"
             >
-              <KopSurat profile={profile} />
+              {(paperPreset?.showKop ?? true) && <KopSurat profile={profile} />}
 
               <div className="my-auto text-center space-y-6">
                 <div className="inline-block border-4 border-emerald-900 bg-emerald-50 px-12 py-5 rounded-2xl shadow-xs">
@@ -202,6 +243,16 @@ export const LabelAdministrasi: React.FC<LabelAdministrasiProps> = ({
   }
 
   // 3. LABEL AMPLOP SOAL & LJK
+  if (activeRooms.length === 0 || schedules.length === 0) {
+    return (
+      <div className="p-8 text-center bg-white rounded-xl border border-slate-200">
+        <p className="text-slate-500 font-medium">
+          Data Ruang Ujian atau Jadwal Ujian belum tersedia untuk mencetak label amplop.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full flex flex-col items-center">
       {activeRooms.flatMap((room) =>
@@ -212,9 +263,10 @@ export const LabelAdministrasi: React.FC<LabelAdministrasiProps> = ({
           return (
             <div
               key={`amplop-${room.id}-${schedule.id}`}
-              className="w-[210mm] min-h-[297mm] p-[12mm] bg-white text-slate-900 border border-slate-300 shadow-sm print:border-none print:shadow-none print:p-0 print-page-break mb-8 print:mb-0"
+              style={sheetStyle}
+              className="saum-sheet border border-slate-300 shadow-sm print-page-break mb-8 print:mb-0"
             >
-              <KopSurat profile={profile} />
+              {(paperPreset?.showKop ?? true) && <KopSurat profile={profile} />}
 
               <div className="border-4 border-slate-900 p-6 rounded-xl mt-4">
                 <div className="text-center border-b-2 border-slate-900 pb-3 mb-4">

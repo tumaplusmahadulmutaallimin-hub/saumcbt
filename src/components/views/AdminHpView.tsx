@@ -34,6 +34,7 @@ import {
 import { saumApi } from '../../utils/api';
 import { HpDocumentsCetak } from '../documents/HpDocumentsCetak';
 import { PrintToolbar } from '../documents/PrintToolbar';
+import { usePrintLayout } from '../../utils/printLayout';
 
 interface ParsedHpRowDraft {
   kodeHp?: string;
@@ -69,6 +70,7 @@ interface AdminHpViewProps {
   ) => Promise<void>;
   onUploadDocument: (doc: UploadedExamDocument) => Promise<void>;
   onDeleteUploadedDoc: (id: string) => Promise<void>;
+  onSavePreset?: (preset: PaperPreset) => Promise<void>;
 }
 
 export const AdminHpView: React.FC<AdminHpViewProps> = ({
@@ -85,7 +87,13 @@ export const AdminHpView: React.FC<AdminHpViewProps> = ({
   onSavePhones,
   onUploadDocument,
   onDeleteUploadedDoc,
+  onSavePreset,
 }) => {
+  const { layout, setLayout } = usePrintLayout(paperPreset, {
+    size: 'A4',
+    orientation: 'portrait',
+    marginMm: 10,
+  });
   const [activeTab, setActiveTab] = useState<
     'penerimaan' | 'pengambilan' | 'pengembalian' | 'pengecasan' | 'pinjaman' | 'rekap' | 'upload_arsip'
   >('penerimaan');
@@ -120,7 +128,7 @@ export const AdminHpView: React.FC<AdminHpViewProps> = ({
     kodeHp: `HP-${String(phoneRecords.length + 1).padStart(3, '0')}`,
     studentId: '',
     namaSantri: '',
-    kelas: examConfig.registeredClasses[0] || 'X-A',
+    kelas: examConfig.registeredClasses[0] || '',
     merekModel: '',
     warna: '',
     namaPenyetor: '',
@@ -132,7 +140,7 @@ export const AdminHpView: React.FC<AdminHpViewProps> = ({
   const [newLoan, setNewLoan] = useState({
     kodeHp: `PINJ-${String(phoneRecords.filter((p) => p.kategori !== 'Titipan').length + 1).padStart(3, '0')}`,
     namaSantri: '',
-    kelas: examConfig.registeredClasses[0] || 'X-A',
+    kelas: examConfig.registeredClasses[0] || '',
     merekModel: '',
     namaPemberiPinjaman: '',
     tanggalPinjam: '',
@@ -142,7 +150,7 @@ export const AdminHpView: React.FC<AdminHpViewProps> = ({
 
   // Handover Form state
   const [handoverTargetId, setHandoverTargetId] = useState<string>(phoneRecords[0]?.id || '');
-  const [handoverRuang, setHandoverRuang] = useState<string>(rooms[0]?.namaRuang || 'Ruang 01');
+  const [handoverRuang, setHandoverRuang] = useState<string>(rooms[0]?.namaRuang || '');
   const [handoverPhysicalMatch, setHandoverPhysicalMatch] = useState<boolean>(true);
   const [handoverNote, setHandoverNote] = useState<string>('');
 
@@ -656,8 +664,9 @@ export const AdminHpView: React.FC<AdminHpViewProps> = ({
         <PrintToolbar
           title="Cetak Administrasi HP Santri (Form Manual)"
           onBack={() => setShowPrint(false)}
-          paperSize={paperPreset?.size || 'A4'}
-          orientation="portrait"
+          layout={layout}
+          onLayoutChange={setLayout}
+          onSaveLayout={onSavePreset}
         />
         <div className="no-print max-w-3xl mx-auto mb-4 bg-white border border-slate-200 rounded-lg px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
           <label className="inline-flex items-center gap-2 font-semibold text-slate-800 cursor-pointer">
@@ -678,15 +687,17 @@ export const AdminHpView: React.FC<AdminHpViewProps> = ({
             <Upload className="w-3.5 h-3.5" /> Setelah Cetak: Upload & Baca Sistem
           </button>
         </div>
-        <HpDocumentsCetak
-          profile={profile}
-          examConfig={examConfig}
-          phoneRecords={phoneRecords}
-          hpLogs={hpLogs}
-          docSubtype={printSubtype}
-          paperPreset={paperPreset}
-          manualBlankPrint={manualBlankPrint}
-        />
+        <div className="overflow-x-auto pb-8 print:overflow-visible print:pb-0">
+          <HpDocumentsCetak
+            profile={profile}
+            examConfig={examConfig}
+            phoneRecords={phoneRecords}
+            hpLogs={hpLogs}
+            docSubtype={printSubtype}
+            paperPreset={layout}
+            manualBlankPrint={manualBlankPrint}
+          />
+        </div>
       </div>
     );
   }
@@ -911,78 +922,86 @@ export const AdminHpView: React.FC<AdminHpViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {phoneRecords.map((hp) => (
-                  <tr key={hp.id}>
-                    <td className="px-3 py-2.5 font-mono font-bold text-emerald-800">{hp.kodeHp}</td>
-                    <td className="px-3 py-2.5">
-                      <div className="font-bold text-slate-900">{hp.namaSantri}</div>
-                      <div className="text-slate-500">Kelas {hp.kelas}</div>
+                {phoneRecords.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                      Belum ada data HP santri. Gunakan tombol "Muat Nama dari DNPU" atau tambahkan manual di atas.
                     </td>
-                    <td className="px-3 py-2">
-                      {canEdit ? (
-                        <input
-                          value={hp.merekModel || ''}
-                          placeholder="Isi manual..."
-                          onChange={(e) => handleUpdateField(hp.id, { merekModel: e.target.value })}
-                          className="w-full px-2 py-1 border border-slate-200 rounded bg-white text-xs"
-                        />
-                      ) : (
-                        hp.merekModel || <span className="text-slate-400 italic">Manual</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2">
-                      {canEdit ? (
-                        <div className="flex gap-1">
-                          <input
-                            value={hp.nomorBox || ''}
-                            placeholder="Box"
-                            onChange={(e) => handleUpdateField(hp.id, { nomorBox: e.target.value })}
-                            className="w-16 px-1.5 py-1 border border-slate-200 rounded font-mono"
-                          />
-                          <input
-                            value={hp.nomorSlot || ''}
-                            placeholder="Slot"
-                            onChange={(e) => handleUpdateField(hp.id, { nomorSlot: e.target.value })}
-                            className="w-12 px-1.5 py-1 border border-slate-200 rounded font-mono text-center"
-                          />
-                        </div>
-                      ) : (
-                        <span className="font-mono">{hp.nomorBox || '-'} / {hp.nomorSlot || '-'}</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2">
-                      {canEdit ? (
-                        <input
-                          value={hp.namaPenyetor || ''}
-                          placeholder="Isi manual..."
-                          onChange={(e) => handleUpdateField(hp.id, { namaPenyetor: e.target.value })}
-                          className="w-full px-2 py-1 border border-slate-200 rounded bg-white text-xs"
-                        />
-                      ) : (
-                        hp.namaPenyetor || '-'
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {hp.kategori !== 'Titipan' ? (
-                        <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-950 font-extrabold uppercase text-[11px]">
-                          PINJAMAN
-                        </span>
-                      ) : (
-                        <span className="font-semibold text-slate-700">Titipan</span>
-                      )}
-                    </td>
-                    {canEdit && (
-                      <td className="px-3 py-2.5 text-right">
-                        <button
-                          onClick={() => handleDeletePhone(hp.id)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    )}
                   </tr>
-                ))}
+                ) : (
+                  phoneRecords.map((hp) => (
+                    <tr key={hp.id}>
+                      <td className="px-3 py-2.5 font-mono font-bold text-emerald-800">{hp.kodeHp}</td>
+                      <td className="px-3 py-2.5">
+                        <div className="font-bold text-slate-900">{hp.namaSantri}</div>
+                        <div className="text-slate-500">Kelas {hp.kelas}</div>
+                      </td>
+                      <td className="px-3 py-2">
+                        {canEdit ? (
+                          <input
+                            value={hp.merekModel || ''}
+                            placeholder="Isi manual..."
+                            onChange={(e) => handleUpdateField(hp.id, { merekModel: e.target.value })}
+                            className="w-full px-2 py-1 border border-slate-200 rounded bg-white text-xs"
+                          />
+                        ) : (
+                          hp.merekModel || <span className="text-slate-400 italic">Manual</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        {canEdit ? (
+                          <div className="flex gap-1">
+                            <input
+                              value={hp.nomorBox || ''}
+                              placeholder="Box"
+                              onChange={(e) => handleUpdateField(hp.id, { nomorBox: e.target.value })}
+                              className="w-16 px-1.5 py-1 border border-slate-200 rounded font-mono"
+                            />
+                            <input
+                              value={hp.nomorSlot || ''}
+                              placeholder="Slot"
+                              onChange={(e) => handleUpdateField(hp.id, { nomorSlot: e.target.value })}
+                              className="w-12 px-1.5 py-1 border border-slate-200 rounded font-mono text-center"
+                            />
+                          </div>
+                        ) : (
+                          <span className="font-mono">{hp.nomorBox || '-'} / {hp.nomorSlot || '-'}</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        {canEdit ? (
+                          <input
+                            value={hp.namaPenyetor || ''}
+                            placeholder="Isi manual..."
+                            onChange={(e) => handleUpdateField(hp.id, { namaPenyetor: e.target.value })}
+                            className="w-full px-2 py-1 border border-slate-200 rounded bg-white text-xs"
+                          />
+                        ) : (
+                          hp.namaPenyetor || '-'
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {hp.kategori !== 'Titipan' ? (
+                          <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-950 font-extrabold uppercase text-[11px]">
+                            PINJAMAN
+                          </span>
+                        ) : (
+                          <span className="font-semibold text-slate-700">Titipan</span>
+                        )}
+                      </td>
+                      {canEdit && (
+                        <td className="px-3 py-2.5 text-right">
+                          <button
+                            onClick={() => handleDeletePhone(hp.id)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

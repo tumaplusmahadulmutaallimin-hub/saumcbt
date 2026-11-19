@@ -14,6 +14,7 @@ import {
 import { DaftarHadir } from '../documents/DaftarHadir';
 import { PrintToolbar } from '../documents/PrintToolbar';
 import { exportStudentsToExcel } from '../../utils/dnpu';
+import { usePrintLayout } from '../../utils/printLayout';
 
 interface DaftarHadirViewProps {
   profile: MadrasahProfile;
@@ -26,6 +27,7 @@ interface DaftarHadirViewProps {
   supervisorAssignments: SupervisorAssignment[];
   numberingConfig: NumberingConfig;
   paperPreset?: PaperPreset;
+  onSavePreset?: (next: PaperPreset) => Promise<void>;
 }
 
 export const DaftarHadirView: React.FC<DaftarHadirViewProps> = ({
@@ -39,9 +41,15 @@ export const DaftarHadirView: React.FC<DaftarHadirViewProps> = ({
   supervisorAssignments,
   numberingConfig,
   paperPreset,
+  onSavePreset,
 }) => {
   const [selectedRoomId, setSelectedRoomId] = useState<string>(rooms[0]?.id || 'all');
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>(schedules[0]?.id || 'all');
+  const { layout, setLayout } = usePrintLayout(paperPreset, {
+    size: 'A4',
+    orientation: 'portrait',
+    marginMm: 10,
+  });
 
   const handleExport = () => {
     const filtered = students.filter(
@@ -90,11 +98,12 @@ export const DaftarHadirView: React.FC<DaftarHadirViewProps> = ({
       <PrintToolbar
         title="Daftar Hadir Peserta Ujian (Urut Kelas Terendah → A-Z)"
         onExportExcel={handleExport}
-        paperSize={paperPreset?.size || 'A4'}
-        orientation={paperPreset?.orientation || 'portrait'}
+        layout={layout}
+        onLayoutChange={setLayout}
+        onSaveLayout={onSavePreset}
       />
 
-      <div className="overflow-x-auto pb-8">
+      <div className="overflow-x-auto pb-8 print:overflow-visible print:pb-0">
         <DaftarHadir
           profile={profile}
           examConfig={examConfig}
@@ -107,7 +116,7 @@ export const DaftarHadirView: React.FC<DaftarHadirViewProps> = ({
           numberingConfig={numberingConfig}
           selectedRoomId={selectedRoomId}
           selectedScheduleId={selectedScheduleId}
-          paperPreset={paperPreset}
+          paperPreset={layout}
         />
       </div>
     </div>

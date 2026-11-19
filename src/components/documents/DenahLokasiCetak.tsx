@@ -11,6 +11,7 @@ import {
 import { KopSurat } from './KopSurat';
 import { formatIndonesianDate } from '../../utils/qrBarcode';
 import { computeClassRangesInRoom } from '../../utils/seating';
+import { getSheetScreenStyle } from '../../utils/printLayout';
 
 interface DenahLokasiCetakProps {
   profile: MadrasahProfile;
@@ -34,10 +35,9 @@ export const DenahLokasiCetak: React.FC<DenahLokasiCetakProps> = ({
   const roomMap = new Map(rooms.map((r) => [r.id, r]));
   const supervisorMap = new Map(supervisors.map((s) => [s.id, s]));
 
-  const isF4 = paperPreset?.size === 'F4';
-  const widthClass = isF4 ? 'w-[330mm] min-h-[215mm]' : 'w-[297mm] min-h-[210mm]';
+  const sheetStyle = getSheetScreenStyle(paperPreset, { orientation: 'landscape' });
 
-  // Fixed 2 rows x 3 cols grid matching exact Section F.2 layout
+  // Fixed 2 rows x 3 cols grid matching exact layout
   const getCell = (row: 0 | 1, col: 0 | 1 | 2) =>
     physicalClassrooms.find((pc) => pc.row === row && pc.col === col);
 
@@ -121,7 +121,8 @@ export const DenahLokasiCetak: React.FC<DenahLokasiCetakProps> = ({
   return (
     <div className="w-full flex flex-col items-center overflow-x-auto">
       <div
-        className={`${widthClass} p-[10mm] bg-white text-slate-900 border border-slate-300 shadow-sm print:border-none print:shadow-none print:p-0 print-page-break`}
+        style={sheetStyle}
+        className="saum-sheet border border-slate-300 shadow-sm print-page-break"
       >
         {(paperPreset?.showKop ?? true) && <KopSurat profile={profile} isCompact />}
 
@@ -211,17 +212,20 @@ export const DenahLokasiCetak: React.FC<DenahLokasiCetakProps> = ({
             <p className="font-bold">Mengetahui,</p>
             <p className="font-bold">Kepala Madrasah,</p>
             <div className="h-12" />
-            <p className="font-bold underline uppercase">{profile.namaKepala}</p>
+            <p className="font-bold underline uppercase">{profile.namaKepala || '.........................'}</p>
             <p className="text-[10px] font-sans">NIP. {profile.nipKepala || '-'}</p>
           </div>
 
           <div className="text-center w-60 leading-tight">
             <p>
-              {profile.tempatTandaTangan}, {formatIndonesianDate(profile.tanggalSurat)}
+              {profile.tempatTandaTangan ? `${profile.tempatTandaTangan}, ` : ''}
+              {formatIndonesianDate(profile.tanggalSurat)}
             </p>
             <p className="font-bold">Ketua Panitia Ujian,</p>
             <div className="h-12" />
-            <p className="font-bold underline uppercase">{profile.namaKetuaPanitia || profile.namaKepala}</p>
+            <p className="font-bold underline uppercase">
+              {profile.namaKetuaPanitia || profile.namaKepala || '.........................'}
+            </p>
             <p className="text-[10px] font-sans">NIP. {profile.nipKetuaPanitia || '-'}</p>
           </div>
         </div>

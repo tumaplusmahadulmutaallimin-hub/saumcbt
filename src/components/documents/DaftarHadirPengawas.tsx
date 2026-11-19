@@ -10,6 +10,7 @@ import {
 } from '../../types';
 import { KopSurat } from './KopSurat';
 import { formatIndonesianDate } from '../../utils/qrBarcode';
+import { getSheetScreenStyle } from '../../utils/printLayout';
 
 interface DaftarHadirPengawasProps {
   profile: MadrasahProfile;
@@ -46,13 +47,23 @@ export const DaftarHadirPengawas: React.FC<DaftarHadirPengawasProps> = ({
     return roomNames.size > 0 ? Array.from(roomNames).join(', ') : 'Cadangan';
   };
 
-  const isF4 = paperPreset?.size === 'F4';
-  const sheetClass = isF4 ? 'w-[215mm] min-h-[330mm]' : 'w-[210mm] min-h-[297mm]';
+  const sheetStyle = getSheetScreenStyle(paperPreset);
+
+  if (supervisors.length === 0) {
+    return (
+      <div className="p-8 text-center bg-white rounded-xl border border-slate-200">
+        <p className="text-slate-500 font-medium">
+          Belum ada data pengawas ujian. Tambahkan pengawas di menu Pengawas terlebih dahulu.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full flex flex-col items-center">
       <div
-        className={`${sheetClass} p-[10mm] bg-white text-slate-900 border border-slate-300 shadow-sm print:border-none print:shadow-none print:p-0 print-page-break mb-8 print:mb-0 text-[11px] leading-relaxed`}
+        style={sheetStyle}
+        className="saum-sheet border border-slate-300 shadow-sm print-page-break mb-8 print:mb-0 text-[11px] leading-relaxed"
       >
         {(paperPreset?.showKop ?? true) && <KopSurat profile={profile} isCompact />}
 
@@ -117,18 +128,21 @@ export const DaftarHadirPengawas: React.FC<DaftarHadirPengawasProps> = ({
             <p className="font-bold">Ketua Panitia Ujian,</p>
             <div className="h-14" />
             <p className="font-bold underline uppercase text-slate-950">
-              {profile.namaKetuaPanitia || profile.namaKepala}
+              {profile.namaKetuaPanitia || profile.namaKepala || '.........................'}
             </p>
             <p className="text-[10px] font-sans">NIP. {profile.nipKetuaPanitia || '-'}</p>
           </div>
 
           <div className="text-center w-56 leading-tight">
             <p className="text-[11px]">
-              {profile.tempatTandaTangan}, {formatIndonesianDate(profile.tanggalSurat)}
+              {profile.tempatTandaTangan ? `${profile.tempatTandaTangan}, ` : ''}
+              {formatIndonesianDate(profile.tanggalSurat)}
             </p>
             <p className="font-bold">Kepala Madrasah,</p>
             <div className="h-14" />
-            <p className="font-bold underline uppercase text-slate-950">{profile.namaKepala}</p>
+            <p className="font-bold underline uppercase text-slate-950">
+              {profile.namaKepala || '.........................'}
+            </p>
             <p className="text-[10px] font-sans">NIP. {profile.nipKepala || '-'}</p>
           </div>
         </div>

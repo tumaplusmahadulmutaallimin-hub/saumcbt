@@ -5,8 +5,9 @@ import {
   resetBackendDetection,
   saumApi,
 } from './api';
+import type { Student } from '../types';
 
-test('saumApi seamlessly falls back to local storage on static/Vercel HTTP 404 without throwing', async () => {
+test('saumApi falls back to clean local storage on static HTTP 404 and preserves Arif Syaifudin, S.H as Super Admin', async () => {
   resetBackendDetection();
   const originalFetch = globalThis.fetch;
 
@@ -24,17 +25,29 @@ test('saumApi seamlessly falls back to local storage on static/Vercel HTTP 404 w
 
     const auth = await saumApi.login('superadmin');
     assert.equal(auth.user.role, 'Super Admin');
+    assert.equal(auth.user.nama, 'Arif Syaifudin, S.H');
     assert.equal(isUsingLocalBackend(), true);
 
     const state = await saumApi.getState();
-    assert.equal(state.students.length > 0, true);
+    assert.equal(state.students.length, 0);
+    assert.equal(state.rooms.length, 0);
     assert.equal(state.rekapConfig.kursiPerMeja, 2);
 
-    const updatedStudents = state.students.map((s, idx) =>
-      idx === 0 ? { ...s, nomorMeja: 77 } : s
-    );
-    const saved = await saumApi.saveDeskNumbers(updatedStudents);
-    assert.equal(saved.students[0].nomorMeja, 77);
+    const sampleStudent: Student = {
+      id: 'st-test-1',
+      nis: '26001',
+      nisn: '0110009999',
+      nama: 'Ahmad Uji Coba',
+      tempatLahir: 'Demak',
+      tanggalLahir: '2010-01-01',
+      jenisKelamin: 'L',
+      kelas: 'X-A',
+      nomorPeserta: '26-01-001',
+      status: 'Aktif',
+    };
+    await saumApi.saveStudents([sampleStudent], 'Test tambah peserta');
+    const saved = await saumApi.saveDeskNumbers([{ ...sampleStudent, nomorMeja: 7 }]);
+    assert.equal(saved.students[0].nomorMeja, 7);
   } finally {
     globalThis.fetch = originalFetch;
     resetBackendDetection();
@@ -54,6 +67,7 @@ test('saumApi falls back when static host serves HTML index.html with status 200
 
     const res = await saumApi.getUsers();
     assert.equal(res.users.length > 0, true);
+    assert.equal(res.users[0].nama, 'Arif Syaifudin, S.H');
     assert.equal(isUsingLocalBackend(), true);
   } finally {
     globalThis.fetch = originalFetch;

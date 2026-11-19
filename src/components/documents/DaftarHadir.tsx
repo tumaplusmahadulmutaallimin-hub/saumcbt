@@ -12,8 +12,9 @@ import {
   SupervisorAssignment,
 } from '../../types';
 import { KopSurat } from './KopSurat';
-import { formatDayAndDate, formatIndonesianDate } from '../../utils/qrBarcode';
+import { formatDayAndDate } from '../../utils/qrBarcode';
 import { compareClasses } from '../../utils/numbering';
+import { getSheetScreenStyle } from '../../utils/printLayout';
 
 interface DaftarHadirProps {
   profile: MadrasahProfile;
@@ -57,8 +58,17 @@ export const DaftarHadir: React.FC<DaftarHadirProps> = ({
   );
 
   const isOnline = examConfig?.moda === 'online';
-  const isF4 = paperPreset?.size === 'F4';
-  const sheetClass = isF4 ? 'w-[215mm] min-h-[330mm]' : 'w-[210mm] min-h-[297mm]';
+  const sheetStyle = getSheetScreenStyle(paperPreset);
+
+  if (activeRooms.length === 0 || activeSchedules.length === 0) {
+    return (
+      <div className="p-8 text-center bg-white rounded-xl border border-slate-200">
+        <p className="text-slate-500 font-medium">
+          Data Ruang Ujian atau Jadwal Ujian belum tersedia. Lengkapi Pembagian Ruang & Jadwal Ujian terlebih dahulu.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full flex flex-col items-center">
@@ -94,7 +104,8 @@ export const DaftarHadir: React.FC<DaftarHadirProps> = ({
           return (
             <div
               key={`dh-${room.id}-${schedule.id}`}
-              className={`${sheetClass} p-[8mm] bg-white text-slate-900 border border-slate-300 shadow-sm print:border-none print:shadow-none print:p-0 print-page-break mb-8 print:mb-0`}
+              style={sheetStyle}
+              className="saum-sheet border border-slate-300 shadow-sm print-page-break mb-8 print:mb-0"
             >
               {(paperPreset?.showKop ?? true) && <KopSurat profile={profile} isCompact />}
 
@@ -234,7 +245,8 @@ export const DaftarHadir: React.FC<DaftarHadirProps> = ({
 
                 <div className="text-center w-56 leading-tight">
                   <p className="text-[10px]">
-                    {profile.tempatTandaTangan}, {formatIndonesianDate(schedule.tanggal)}
+                    {profile.tempatTandaTangan ? `${profile.tempatTandaTangan}, ` : ''}
+                    {formatDayAndDate(schedule.tanggal)}
                   </p>
                   <p className="font-bold">Pengawas Ruang II,</p>
                   <div className="h-14" />

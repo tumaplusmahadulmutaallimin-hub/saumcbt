@@ -8,6 +8,7 @@ import {
 } from '../../types';
 import { KopSurat } from './KopSurat';
 import { formatIndonesianDate } from '../../utils/qrBarcode';
+import { getSheetScreenStyle } from '../../utils/printLayout';
 
 interface HpDocumentsCetakProps {
   profile: MadrasahProfile;
@@ -28,8 +29,7 @@ export const HpDocumentsCetak: React.FC<HpDocumentsCetakProps> = ({
   paperPreset,
   manualBlankPrint = true,
 }) => {
-  const isF4 = paperPreset?.size === 'F4';
-  const sheetClass = isF4 ? 'w-[215mm] min-h-[330mm]' : 'w-[210mm] min-h-[297mm]';
+  const sheetStyle = getSheetScreenStyle(paperPreset);
 
   const titles: Record<HpDocumentsCetakProps['docSubtype'], string> = {
     hp_penerimaan: 'FORMULIR PENERIMAAN HP SANTRI (ISIAN MANUAL)',
@@ -56,7 +56,8 @@ export const HpDocumentsCetak: React.FC<HpDocumentsCetakProps> = ({
   return (
     <div className="w-full flex flex-col items-center">
       <div
-        className={`${sheetClass} p-[10mm] bg-white text-slate-900 border border-slate-300 shadow-sm print:border-none print:shadow-none print:p-0 print-page-break mb-8 print:mb-0`}
+        style={sheetStyle}
+        className="saum-sheet border border-slate-300 shadow-sm print-page-break mb-8 print:mb-0"
       >
         {(paperPreset?.showKop ?? true) && <KopSurat profile={profile} isCompact />}
 
@@ -255,13 +256,16 @@ export const HpDocumentsCetak: React.FC<HpDocumentsCetakProps> = ({
             <p className="font-bold">Mengetahui,</p>
             <p className="font-bold">Ketua Panitia Ujian,</p>
             <div className="h-14" />
-            <p className="font-bold underline uppercase">{profile.namaKetuaPanitia || profile.namaKepala}</p>
+            <p className="font-bold underline uppercase">
+              {profile.namaKetuaPanitia || profile.namaKepala || '.........................'}
+            </p>
             <p className="text-[9.5px] font-sans">NIP. {profile.nipKetuaPanitia || '-'}</p>
           </div>
 
           <div className="text-center w-56 leading-tight">
             <p>
-              {profile.tempatTandaTangan}, {formatIndonesianDate(profile.tanggalSurat)}
+              {profile.tempatTandaTangan ? `${profile.tempatTandaTangan}, ` : ''}
+              {formatIndonesianDate(profile.tanggalSurat)}
             </p>
             <p className="font-bold">Petugas Administrasi HP,</p>
             <div className="h-14" />

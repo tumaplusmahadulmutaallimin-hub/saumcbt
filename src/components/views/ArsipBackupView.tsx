@@ -365,6 +365,13 @@ export const ArsipBackupView: React.FC<ArsipBackupViewProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
+            {filteredArchives.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
+                  Belum ada arsip ujian tersimpan. Klik "Arsipkan Ujian Saat Ini" untuk menyimpan snapshot arsip.
+                </td>
+              </tr>
+            ) : null}
             {filteredArchives.map((arch) => (
               <tr key={arch.id} className="hover:bg-slate-50/70">
                 <td className="px-4 py-3">

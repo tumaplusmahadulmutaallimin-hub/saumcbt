@@ -58,6 +58,7 @@ import { HpDocumentsCetak } from '../documents/HpDocumentsCetak';
 import { JadwalUjianCetak } from '../documents/JadwalUjianCetak';
 import { DnpuCetak } from '../documents/DnpuCetak';
 import { exportStudentsToExcel, extractJenjang } from '../../utils/dnpu';
+import { usePrintLayout } from '../../utils/printLayout';
 
 interface CetakDokumenViewProps {
   profile: MadrasahProfile;
@@ -79,6 +80,7 @@ interface CetakDokumenViewProps {
   paperPresets: PaperPreset[];
   initialDocType?: DocumentType;
   initialRoomId?: string;
+  onSavePreset?: (next: PaperPreset) => Promise<void>;
 }
 
 export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
@@ -101,6 +103,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
   paperPresets,
   initialDocType,
   initialRoomId,
+  onSavePreset,
 }) => {
   const [selectedDoc, setSelectedDoc] = useState<DocumentType>(initialDocType || 'denah_ruang');
   const [selectedRoomId, setSelectedRoomId] = useState<string>(initialRoomId || 'all');
@@ -130,8 +133,8 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
     { id: 'segel_soal', title: '11. Segel Soal & LJK', icon: FileText, presetKey: 'segel' },
     { id: 'berita_acara', title: '12. Berita Acara Dinamis', icon: FileText, presetKey: 'berita_acara' },
     { id: 'tata_tertib', title: '13. Tata Tertib Ujian', icon: BookOpen, presetKey: 'default' },
-    { id: 'kartu_peserta', title: '14. Kartu Peserta Ujian', icon: FileText, presetKey: 'default' },
-    { id: 'label_meja', title: '15. Cetak Nomor Meja', icon: Tag, presetKey: 'default' },
+    { id: 'kartu_peserta', title: '14. Kartu Peserta Ujian (6/F4)', icon: FileText, presetKey: 'kartu_peserta' },
+    { id: 'label_meja', title: '15. Cetak Nomor Meja (6/F4)', icon: Tag, presetKey: 'nomor_meja' },
     { id: 'sk_panitia', title: '16. SK Panitia Ujian', icon: Award, presetKey: 'default' },
     { id: 'hp_penerimaan', title: '17a. HP: Penerimaan', icon: Smartphone, presetKey: 'dokumen_hp' },
     { id: 'hp_pengambilan', title: '17b. HP: Pengambilan', icon: Smartphone, presetKey: 'dokumen_hp' },
@@ -143,21 +146,22 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
   ];
 
   const currentDocMeta = docCatalog.find((d) => d.id === selectedDoc) || docCatalog[0];
-  const basePreset = paperPresets.find((p) => p.id === currentDocMeta.presetKey) || paperPresets[0];
+  const basePreset =
+    paperPresets.find((p) => p.id === currentDocMeta.presetKey) ||
+    paperPresets.find((p) => p.id === 'default') ||
+    paperPresets[0];
 
-  const [overrideSize, setOverrideSize] = useState<PaperSize | 'preset'>('preset');
-  const [overrideOrientation, setOverrideOrientation] = useState<PaperOrientation | 'preset'>('preset');
-
-  const activePaperSize: PaperSize =
-    overrideSize === 'preset' ? basePreset?.size || 'A4' : overrideSize;
-  const activeOrientation: PaperOrientation =
-    overrideOrientation === 'preset'
-      ? currentDocMeta.defaultOrientation || basePreset?.orientation || 'portrait'
-      : overrideOrientation;
-
-  const effectivePreset: PaperPreset | undefined = basePreset
-    ? { ...basePreset, size: activePaperSize, orientation: activeOrientation }
-    : undefined;
+  const { layout, setLayout } = usePrintLayout(basePreset, {
+    size:
+      currentDocMeta.presetKey === 'kartu_peserta' || currentDocMeta.presetKey === 'nomor_meja'
+        ? 'F4'
+        : basePreset?.size || 'A4',
+    orientation: currentDocMeta.defaultOrientation || basePreset?.orientation || 'portrait',
+    marginMm:
+      currentDocMeta.presetKey === 'kartu_peserta' || currentDocMeta.presetKey === 'nomor_meja'
+        ? 6
+        : undefined,
+  });
 
   const filteredStudents = useMemo(() => {
     return students.filter((s) => {
@@ -209,10 +213,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
             return (
               <button
                 key={doc.id}
-                onClick={() => {
-                  setSelectedDoc(doc.id);
-                  setOverrideOrientation('preset');
-                }}
+                onClick={() => setSelectedDoc(doc.id)}
                 className={`p-2.5 rounded-lg border text-left flex items-center gap-2 transition-colors cursor-pointer ${
                   active
                     ? 'border-emerald-700 bg-emerald-50 text-emerald-950 font-bold'
@@ -281,20 +282,20 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
 
           <div className="flex items-center gap-2 ml-auto">
             <select
-              value={overrideSize}
-              onChange={(e) => setOverrideSize(e.target.value as PaperSize | 'preset')}
+              aria-label="Pilih Ukuran Kertas Cepat"
+              value={layout.size}
+              onChange={(e) => setLayout({ ...layout, size: e.target.value as PaperSize })}
               className="px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-semibold"
             >
-              <option value="preset">Kertas Preset ({basePreset?.size || 'A4'})</option>
-              <option value="A4">Kertas A4</option>
-              <option value="F4">Kertas F4 (Folio)</option>
+              <option value="A4">Kertas A4 (210×297)</option>
+              <option value="F4">Kertas F4 (215×330)</option>
             </select>
             <select
-              value={overrideOrientation}
-              onChange={(e) => setOverrideOrientation(e.target.value as PaperOrientation | 'preset')}
+              aria-label="Pilih Orientasi Cepat"
+              value={layout.orientation}
+              onChange={(e) => setLayout({ ...layout, orientation: e.target.value as PaperOrientation })}
               className="px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-semibold"
             >
-              <option value="preset">Orientasi Bawaan</option>
               <option value="portrait">Portrait</option>
               <option value="landscape">Landscape</option>
             </select>
@@ -321,9 +322,9 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
               onChange={(e) => setNomorMejaStyle(e.target.value as NomorMejaPrintStyle)}
               className="px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-semibold"
             >
-              <option value="label_lengkap">Label Nomor Meja & Data Peserta Lengkap (8/hal)</option>
+              <option value="label_lengkap">Label Nomor Meja & Data Peserta Lengkap (6/F4 • Penuh)</option>
               <option value="berpasangan_2kursi">Label Meja Berpasangan (1 Meja = 2 Kursi)</option>
-              <option value="kartu_angka_besar">Kartu Angka Nomor Meja Besar (6/hal)</option>
+              <option value="kartu_angka_besar">Kartu Angka Nomor Meja Besar (6/F4 • Penuh)</option>
               <option value="daftar_meja">Daftar Rekap Nomor Meja Per Ruang</option>
             </select>
           </div>
@@ -332,8 +333,9 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
 
       <PrintToolbar
         title={selectedDoc === 'bundle_semua' ? 'Bundle Seluruh Dokumen Administrasi' : currentDocMeta.title}
-        paperSize={activePaperSize}
-        orientation={activeOrientation}
+        layout={layout}
+        onLayoutChange={setLayout}
+        onSaveLayout={onSavePreset}
         onExportExcel={
           canExportTableExcel
             ? () => exportStudentsToExcel(filteredStudents, examConfig.moda === 'online', `${selectedDoc}_SAUM.xlsx`)
@@ -341,7 +343,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
         }
       />
 
-      <div className="w-full overflow-x-auto pb-12">
+      <div className="w-full overflow-x-auto pb-12 print:overflow-visible print:pb-0">
         {(selectedDoc === 'dnpu' || selectedDoc === 'nomor_peserta' || selectedDoc === 'pembagian_ruang') && (
           <DnpuCetak
             profile={profile}
@@ -351,7 +353,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
             numberingConfig={numberingConfig}
             mode={selectedDoc}
             selectedRoomId={selectedRoomId}
-            paperPreset={effectivePreset}
+            paperPreset={layout}
           />
         )}
 
@@ -363,7 +365,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
             rooms={rooms}
             students={filteredStudents}
             supervisors={supervisors}
-            paperPreset={effectivePreset}
+            paperPreset={layout}
           />
         )}
 
@@ -376,7 +378,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
             supervisors={supervisors}
             selectedRoomId={selectedRoomId}
             selectedSesi={selectedSesi > 0 ? selectedSesi : undefined}
-            paperPreset={effectivePreset}
+            paperPreset={layout}
           />
         )}
 
@@ -394,7 +396,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
             selectedRoomId={selectedRoomId}
             selectedScheduleId={selectedScheduleId}
             selectedSesi={selectedSesi > 0 ? selectedSesi : undefined}
-            paperPreset={effectivePreset}
+            paperPreset={layout}
           />
         )}
 
@@ -406,7 +408,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
             students={filteredStudents}
             physicalClassrooms={physicalClassrooms}
             selectedRoomId={selectedRoomId}
-            paperPreset={effectivePreset}
+            paperPreset={layout}
           />
         )}
 
@@ -419,7 +421,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
             rooms={rooms}
             supervisors={supervisors}
             supervisorAssignments={supervisorAssignments}
-            paperPreset={effectivePreset}
+            paperPreset={layout}
           />
         )}
 
@@ -431,7 +433,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
             supervisors={supervisors}
             rooms={rooms}
             supervisorAssignments={supervisorAssignments}
-            paperPreset={effectivePreset}
+            paperPreset={layout}
           />
         )}
 
@@ -442,6 +444,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
             supervisors={supervisors}
             rooms={rooms}
             selectedType="surat_tugas"
+            paperPreset={layout}
           />
         )}
 
@@ -452,6 +455,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
             supervisors={supervisors}
             rooms={rooms}
             selectedType="sk_panitia"
+            paperPreset={layout}
           />
         )}
 
@@ -467,7 +471,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
             sealConfigs={sealConfigs}
             selectedRoomId={selectedRoomId}
             selectedScheduleId={selectedScheduleId}
-            paperPreset={effectivePreset}
+            paperPreset={layout}
           />
         )}
 
@@ -483,7 +487,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
             supervisorAssignments={supervisorAssignments}
             selectedRoomId={selectedRoomId}
             selectedScheduleId={selectedScheduleId}
-            paperPreset={effectivePreset}
+            paperPreset={layout}
           />
         )}
 
@@ -492,7 +496,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
             profile={profile}
             type="semua"
             tataTertibDocs={tataTertibDocs}
-            paperPreset={effectivePreset}
+            paperPreset={layout}
           />
         )}
 
@@ -504,6 +508,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
             rooms={rooms}
             numberingConfig={numberingConfig}
             selectedRoomId={selectedRoomId}
+            paperPreset={layout}
           />
         )}
 
@@ -518,7 +523,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
             selectedSesi={selectedSesi > 0 ? selectedSesi : undefined}
             printStyle={nomorMejaStyle}
             kursiPerMeja={rekapConfig.kursiPerMeja}
-            paperPreset={effectivePreset}
+            paperPreset={layout}
           />
         )}
 
@@ -533,6 +538,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
             numberingConfig={numberingConfig}
             selectedSubtype={selectedDoc}
             selectedRoomId={selectedRoomId}
+            paperPreset={layout}
           />
         )}
 
@@ -547,7 +553,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
             phoneRecords={phoneRecords}
             hpLogs={hpLogs}
             docSubtype={selectedDoc}
-            paperPreset={effectivePreset}
+            paperPreset={layout}
             manualBlankPrint={hpManualBlank}
           />
         )}
@@ -561,6 +567,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
             subjects={subjects}
             committee={committee}
             supervisors={supervisors}
+            paperPreset={layout}
           />
         )}
 
@@ -573,21 +580,21 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
             schedules={schedules}
             subjects={subjects}
             rekapConfig={rekapConfig}
-            paperPreset={effectivePreset}
+            paperPreset={layout}
           />
         )}
 
         {selectedDoc === 'bundle_semua' && (
-          <div className="space-y-8 flex flex-col items-center">
-            <DnpuCetak profile={profile} examConfig={examConfig} students={filteredStudents} rooms={rooms} numberingConfig={numberingConfig} mode="dnpu" />
-            <DenahLokasiCetak profile={profile} examConfig={examConfig} physicalClassrooms={physicalClassrooms} rooms={rooms} students={filteredStudents} supervisors={supervisors} />
-            <DenahRuangCetak profile={profile} examConfig={examConfig} rooms={rooms} students={filteredStudents} supervisors={supervisors} />
-            <LabelRuangCetak profile={profile} examConfig={examConfig} rooms={rooms} students={filteredStudents} physicalClassrooms={physicalClassrooms} />
-            <JadwalUjianCetak profile={profile} examConfig={examConfig} schedules={schedules} subjects={subjects} rooms={rooms} supervisors={supervisors} supervisorAssignments={supervisorAssignments} />
-            <DaftarHadir profile={profile} examConfig={examConfig} students={filteredStudents} rooms={rooms} schedules={schedules.slice(0, 1)} subjects={subjects} supervisors={supervisors} supervisorAssignments={supervisorAssignments} numberingConfig={numberingConfig} />
-            <BeritaAcara profile={profile} examConfig={examConfig} students={filteredStudents} rooms={rooms} schedules={schedules.slice(0, 1)} subjects={subjects} supervisors={supervisors} supervisorAssignments={supervisorAssignments} />
-            <RekapKebutuhanCetak profile={profile} examConfig={examConfig} students={filteredStudents} rooms={rooms} schedules={schedules} subjects={subjects} rekapConfig={rekapConfig} />
-            <TataTertib profile={profile} type="semua" tataTertibDocs={tataTertibDocs} />
+          <div className="space-y-8 flex flex-col items-center print:block print:space-y-0">
+            <DnpuCetak profile={profile} examConfig={examConfig} students={filteredStudents} rooms={rooms} numberingConfig={numberingConfig} mode="dnpu" paperPreset={layout} />
+            <DenahLokasiCetak profile={profile} examConfig={examConfig} physicalClassrooms={physicalClassrooms} rooms={rooms} students={filteredStudents} supervisors={supervisors} paperPreset={layout} />
+            <DenahRuangCetak profile={profile} examConfig={examConfig} rooms={rooms} students={filteredStudents} supervisors={supervisors} paperPreset={layout} />
+            <LabelRuangCetak profile={profile} examConfig={examConfig} rooms={rooms} students={filteredStudents} physicalClassrooms={physicalClassrooms} paperPreset={layout} />
+            <JadwalUjianCetak profile={profile} examConfig={examConfig} schedules={schedules} subjects={subjects} rooms={rooms} supervisors={supervisors} supervisorAssignments={supervisorAssignments} paperPreset={layout} />
+            <DaftarHadir profile={profile} examConfig={examConfig} students={filteredStudents} rooms={rooms} schedules={schedules.slice(0, 1)} subjects={subjects} supervisors={supervisors} supervisorAssignments={supervisorAssignments} numberingConfig={numberingConfig} paperPreset={layout} />
+            <BeritaAcara profile={profile} examConfig={examConfig} students={filteredStudents} rooms={rooms} schedules={schedules.slice(0, 1)} subjects={subjects} supervisors={supervisors} supervisorAssignments={supervisorAssignments} paperPreset={layout} />
+            <RekapKebutuhanCetak profile={profile} examConfig={examConfig} students={filteredStudents} rooms={rooms} schedules={schedules} subjects={subjects} rekapConfig={rekapConfig} paperPreset={layout} />
+            <TataTertib profile={profile} type="semua" tataTertibDocs={tataTertibDocs} paperPreset={layout} />
           </div>
         )}
       </div>

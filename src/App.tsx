@@ -23,7 +23,7 @@ import {
   PackageCheck,
   Armchair,
 } from 'lucide-react';
-import { DocumentType, UserAccount } from './types';
+import { DocumentType, PaperPreset, UserAccount } from './types';
 import {
   INITIAL_ARCHIVES,
   INITIAL_COMMITTEE,
@@ -102,6 +102,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<SaumModuleKey>('dashboard');
   const [activeDocSubtype, setActiveDocSubtype] = useState<DocumentType>('denah_ruang');
   const [activeRoomContextId, setActiveRoomContextId] = useState<string>('all');
+  const [pengaturanTab, setPengaturanTab] = useState<'madrasah_kop' | 'kertas' | 'panitia' | 'akses'>('madrasah_kop');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Hydrate authenticated session & persistent server DB on boot
@@ -209,6 +210,23 @@ export default function App() {
     }
   };
 
+  const handleSavePaperPreset = canRoleEdit(currentUser.role, 'pengaturan')
+    ? async (nextPreset: PaperPreset) => {
+        await withErrorCatch(async () => {
+          const exists = state.paperPresets.some((p) => p.id === nextPreset.id);
+          const nextPresets = exists
+            ? state.paperPresets.map((p) => (p.id === nextPreset.id ? nextPreset : p))
+            : [...state.paperPresets, nextPreset];
+          const res = await saumApi.saveSettings({ paperPresets: nextPresets });
+          setState((prev) => ({
+            ...prev,
+            paperPresets: res.paperPresets,
+            auditLogs: res.auditLogs,
+          }));
+        });
+      }
+    : undefined;
+
   const renderSidebarContent = () => (
     <div className="flex flex-col h-full bg-emerald-950 text-white">
       {/* Brand Block */}
@@ -222,7 +240,9 @@ export default function App() {
           </div>
           <div className="min-w-0">
             <p className="text-sm font-extrabold tracking-wide leading-none">SAUM</p>
-            <p className="text-[11px] text-emerald-300 truncate mt-0.5">{state.profile.namaMadrasah}</p>
+            <p className="text-[11px] text-emerald-300 truncate mt-0.5">
+              {state.profile.namaMadrasah || 'Sistem Administrasi Ujian'}
+            </p>
           </div>
         </button>
         <button
@@ -279,7 +299,7 @@ export default function App() {
       )}
 
       {/* Main Content Shell */}
-      <div className="flex-1 lg:pl-[248px] flex flex-col min-w-0">
+      <div className="flex-1 lg:pl-[248px] print:pl-0 flex flex-col min-w-0">
         {/* Top Sticky Header */}
         <header className="no-print sticky top-0 z-30 h-14 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
@@ -345,7 +365,7 @@ export default function App() {
         )}
 
         {/* Viewport */}
-        <main className="flex-1 min-w-0 p-4 sm:p-6 max-w-7xl w-full mx-auto">
+        <main className="flex-1 min-w-0 p-4 sm:p-6 max-w-7xl w-full mx-auto print:p-0 print:m-0 print:max-w-none print:w-full print:block">
           {isLoading ? (
             <div className="bg-white border border-slate-200 rounded-xl p-10 text-center text-xs text-slate-500">
               Memuat basis data SAUM...
@@ -389,6 +409,10 @@ export default function App() {
                       }));
                     });
                   }}
+                  onOpenKopSettings={() => {
+                    setPengaturanTab('madrasah_kop');
+                    navigateTo('pengaturan');
+                  }}
                 />
               )}
 
@@ -397,6 +421,9 @@ export default function App() {
                   students={state.students}
                   rooms={state.rooms}
                   examConfig={state.examConfig}
+                  numberingConfig={state.numberingConfig}
+                  roomConfig={state.roomConfig}
+                  currentUser={currentUser}
                   canEdit={canRoleEdit(currentUser.role, 'dnpu')}
                   onSaveStudents={async (students, backupReason) => {
                     await withErrorCatch(async () => {
@@ -404,6 +431,32 @@ export default function App() {
                       setState((prev) => ({
                         ...prev,
                         students: res.students,
+                        auditLogs: res.auditLogs,
+                      }));
+                    });
+                  }}
+                  onSaveNumbering={async (payload) => {
+                    await withErrorCatch(async () => {
+                      const res = await saumApi.saveNumbering(payload);
+                      setState((prev) => ({
+                        ...prev,
+                        students: res.students,
+                        numberingConfig: res.numberingConfig,
+                        numberingHistory: res.numberingHistory,
+                        examConfig: res.examConfig,
+                        auditLogs: res.auditLogs,
+                      }));
+                    });
+                  }}
+                  onSaveRooms={async (payload) => {
+                    await withErrorCatch(async () => {
+                      const res = await saumApi.saveRooms(payload);
+                      setState((prev) => ({
+                        ...prev,
+                        students: res.students,
+                        rooms: res.rooms,
+                        roomConfig: res.roomConfig,
+                        examConfig: res.examConfig,
                         auditLogs: res.auditLogs,
                       }));
                     });
@@ -418,16 +471,19 @@ export default function App() {
                       }));
                     });
                   }}
+                  onNavigate={(tab) => navigateTo(tab)}
                 />
               )}
 
               {activeTab === 'penomoran' && (
                 <PenomoranView
+                  profile={state.profile}
                   students={state.students}
                   rooms={state.rooms}
                   config={state.numberingConfig}
                   examConfig={state.examConfig}
                   history={state.numberingHistory}
+                  paperPresets={state.paperPresets}
                   currentUser={currentUser}
                   canEdit={canRoleEdit(currentUser.role, 'penomoran')}
                   onSaveNumbering={async (payload) => {
@@ -443,8 +499,10 @@ export default function App() {
                       }));
                     });
                   }}
+                  onSavePreset={handleSavePaperPreset}
                   onNavigateToPrint={(doc) => navigateTo('cetak', doc || 'nomor_peserta')}
                   onNavigateToDeskNumbers={() => navigateTo('nomor_meja')}
+                  onNavigateToDnpu={() => navigateTo('dnpu')}
                 />
               )}
 
@@ -456,7 +514,10 @@ export default function App() {
                   rooms={state.rooms}
                   numberingConfig={state.numberingConfig}
                   kursiPerMeja={state.rekapConfig.kursiPerMeja}
-                  paperPreset={state.paperPresets.find((p) => p.id === 'default')}
+                  paperPreset={
+                    state.paperPresets.find((p) => p.id === 'nomor_meja') ||
+                    state.paperPresets.find((p) => p.id === 'default')
+                  }
                   canEdit={canRoleEdit(currentUser.role, 'nomor_meja')}
                   onSaveDeskNumbers={async (students) => {
                     await withErrorCatch(async () => {
@@ -468,6 +529,7 @@ export default function App() {
                       }));
                     });
                   }}
+                  onSavePreset={handleSavePaperPreset}
                 />
               )}
 
@@ -516,6 +578,7 @@ export default function App() {
                       }));
                     });
                   }}
+                  onSavePreset={handleSavePaperPreset}
                 />
               )}
 
@@ -542,6 +605,7 @@ export default function App() {
                       }));
                     });
                   }}
+                  onSavePreset={handleSavePaperPreset}
                 />
               )}
 
@@ -557,6 +621,7 @@ export default function App() {
                   supervisorAssignments={state.supervisorAssignments}
                   numberingConfig={state.numberingConfig}
                   paperPreset={state.paperPresets.find((p) => p.id === 'daftar_hadir')}
+                  onSavePreset={handleSavePaperPreset}
                 />
               )}
 
@@ -568,6 +633,7 @@ export default function App() {
                   students={state.students}
                   physicalClassrooms={state.physicalClassrooms}
                   paperPreset={state.paperPresets.find((p) => p.id === 'label_ruang')}
+                  onSavePreset={handleSavePaperPreset}
                 />
               )}
 
@@ -595,6 +661,7 @@ export default function App() {
                       }));
                     });
                   }}
+                  onSavePreset={handleSavePaperPreset}
                 />
               )}
 
@@ -648,6 +715,7 @@ export default function App() {
                       }));
                     });
                   }}
+                  onSavePreset={handleSavePaperPreset}
                 />
               )}
 
@@ -694,6 +762,7 @@ export default function App() {
                       }));
                     });
                   }}
+                  onSavePreset={handleSavePaperPreset}
                 />
               )}
 
@@ -720,6 +789,7 @@ export default function App() {
                       }));
                     });
                   }}
+                  onSavePreset={handleSavePaperPreset}
                 />
               )}
 
@@ -744,6 +814,7 @@ export default function App() {
                   paperPresets={state.paperPresets}
                   initialDocType={activeDocSubtype}
                   initialRoomId={activeRoomContextId}
+                  onSavePreset={handleSavePaperPreset}
                 />
               )}
 
@@ -843,6 +914,7 @@ export default function App() {
                   auditLogs={state.auditLogs}
                   currentUser={currentUser}
                   canEdit={canRoleEdit(currentUser.role, 'pengaturan')}
+                  initialTab={pengaturanTab}
                   onSaveSettings={async (payload) => {
                     await withErrorCatch(async () => {
                       const res = await saumApi.saveSettings(payload);
@@ -858,6 +930,12 @@ export default function App() {
                   }}
                   onSwitchUser={handleSwitchUser}
                   onNavigateToPrintSk={() => navigateTo('cetak', 'sk_panitia')}
+                  onResetClean={async () => {
+                    await withErrorCatch(async () => {
+                      const res = await saumApi.resetClean();
+                      setState(res);
+                    });
+                  }}
                 />
               )}
             </>

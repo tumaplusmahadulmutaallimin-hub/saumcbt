@@ -5,6 +5,8 @@ import {
   sortStudentsForNumbering,
   generateStudentNumbers,
   validateParticipantNumbers,
+  generateExamCredentials,
+  validateExamCredentials,
 } from './numbering';
 import { NumberingConfig, Student } from '../types';
 
@@ -113,3 +115,46 @@ test('validateParticipantNumbers detects duplicates and missing numbers', () => 
   assert.equal(invalidCheck.duplicates.includes('26-01-001'), true);
   assert.equal(invalidCheck.missingCount, 1);
 });
+
+test('generateExamCredentials creates unique unambiguous login credentials for active students', () => {
+  const numbered = generateStudentNumbers(mockStudents, mockConfig);
+  const withCreds = generateExamCredentials(numbered, {
+    basis: 'nomor_peserta',
+    passwordLength: 6,
+    overwriteExisting: true,
+  });
+
+  const check = validateExamCredentials(withCreds);
+  assert.equal(check.isValid, true);
+  assert.equal(check.missingCount, 0);
+  assert.equal(check.duplicates.length, 0);
+
+  const s2 = withCreds.find((s) => s.id === 's2'); // 26-01-001 -> 2601001
+  const s4 = withCreds.find((s) => s.id === 's4'); // Cadangan -> cleared
+  assert.equal(s2?.usernameUjian, '2601001');
+  assert.equal((s2?.passwordUjian || '').length, 6);
+  assert.equal(/[0O1IL]/.test(s2?.passwordUjian || ''), false);
+  assert.equal(s4?.usernameUjian, '');
+  assert.equal(s4?.passwordUjian, '');
+});
+
+test('generateExamCredentials deduplicates collisions and respects overwriteExisting=false', () => {
+  const collided: Student[] = [
+    { ...mockStudents[0], nomorPeserta: '26-01-001', usernameUjian: 'EXIST01', passwordUjian: 'PASS99' },
+    { ...mockStudents[1], nomorPeserta: '26-01-001' },
+    { ...mockStudents[2], nomorPeserta: '26-01-001' },
+  ];
+  const kept = generateExamCredentials(collided, {
+    basis: 'nomor_peserta',
+    overwriteExisting: false,
+    passwordLength: 8,
+  });
+
+  assert.equal(kept[0].usernameUjian, 'EXIST01');
+  assert.equal(kept[0].passwordUjian, 'PASS99');
+  assert.equal(kept[1].usernameUjian, '2601001');
+  assert.equal(kept[2].usernameUjian, '2601001-2');
+  assert.equal((kept[2].passwordUjian || '').length, 8);
+  assert.equal(validateExamCredentials(kept).isValid, true);
+});
+

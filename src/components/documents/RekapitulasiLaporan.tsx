@@ -5,11 +5,13 @@ import {
   ExamSchedule,
   ExamSubject,
   MadrasahProfile,
+  PaperPreset,
   Student,
   Supervisor,
 } from '../../types';
 import { KopSurat } from './KopSurat';
-import { formatDayAndDate, formatIndonesianDate } from '../../utils/qrBarcode';
+import { formatIndonesianDate } from '../../utils/qrBarcode';
+import { getSheetScreenStyle } from '../../utils/printLayout';
 
 interface RekapitulasiLaporanProps {
   profile: MadrasahProfile;
@@ -19,19 +21,17 @@ interface RekapitulasiLaporanProps {
   subjects: ExamSubject[];
   committee: CommitteeMember[];
   supervisors: Supervisor[];
+  paperPreset?: PaperPreset;
 }
 
 export const RekapitulasiLaporan: React.FC<RekapitulasiLaporanProps> = ({
   profile,
   students,
   rooms,
-  schedules,
-  subjects,
-  committee,
-  supervisors,
+  paperPreset,
 }) => {
   const activeStudents = students.filter((s) => s.status === 'Aktif');
-  const subjectMap = new Map(subjects.map((s) => [s.id, s]));
+  const sheetStyle = getSheetScreenStyle(paperPreset);
 
   // Breakdown by class
   const classBreakdown: { [cls: string]: { l: number; p: number; total: number } } = {};
@@ -50,8 +50,11 @@ export const RekapitulasiLaporan: React.FC<RekapitulasiLaporanProps> = ({
 
   return (
     <div className="w-full flex flex-col items-center">
-      <div className="w-[210mm] min-h-[297mm] p-[10mm] bg-white text-slate-900 border border-slate-300 shadow-sm print:border-none print:shadow-none print:p-0 print-page-break mb-8 print:mb-0 text-[11px] leading-relaxed">
-        <KopSurat profile={profile} />
+      <div
+        style={sheetStyle}
+        className="saum-sheet border border-slate-300 shadow-sm print-page-break mb-8 print:mb-0 text-[11px] leading-relaxed"
+      >
+        {(paperPreset?.showKop ?? true) && <KopSurat profile={profile} />}
 
         <div className="text-center my-3">
           <h2 className="text-sm font-bold uppercase font-serif tracking-wide underline">
@@ -200,13 +203,16 @@ export const RekapitulasiLaporan: React.FC<RekapitulasiLaporanProps> = ({
 
           <div className="text-center w-52 leading-tight">
             <p className="text-[11px]">
-              {profile.tempatTandaTangan}, {formatIndonesianDate(profile.tanggalSurat || '2026-03-23')}
+              {profile.tempatTandaTangan ? `${profile.tempatTandaTangan}, ` : ''}
+              {formatIndonesianDate(profile.tanggalSurat)}
             </p>
             <p className="font-bold">Kepala Madrasah,</p>
             <div className="h-16 flex items-center justify-center">
               <span className="text-[10px] text-slate-300 italic font-sans">( Tanda Tangan & Cap )</span>
             </div>
-            <p className="font-bold underline uppercase text-slate-950">{profile.namaKepala}</p>
+            <p className="font-bold underline uppercase text-slate-950">
+              {profile.namaKepala || '.........................'}
+            </p>
             <p className="text-[10px] font-sans">NIP. {profile.nipKepala || '-'}</p>
           </div>
         </div>

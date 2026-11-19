@@ -9,6 +9,7 @@ import {
 } from '../../types';
 import { LabelRuangCetak } from '../documents/LabelRuangCetak';
 import { PrintToolbar } from '../documents/PrintToolbar';
+import { usePrintLayout } from '../../utils/printLayout';
 
 interface LabelRuangViewProps {
   profile: MadrasahProfile;
@@ -17,6 +18,7 @@ interface LabelRuangViewProps {
   students: Student[];
   physicalClassrooms: PhysicalClassroom[];
   paperPreset?: PaperPreset;
+  onSavePreset?: (next: PaperPreset) => Promise<void>;
 }
 
 export const LabelRuangView: React.FC<LabelRuangViewProps> = ({
@@ -26,8 +28,14 @@ export const LabelRuangView: React.FC<LabelRuangViewProps> = ({
   students,
   physicalClassrooms,
   paperPreset,
+  onSavePreset,
 }) => {
   const [selectedRoomId, setSelectedRoomId] = useState<string>('all');
+  const { layout, setLayout } = usePrintLayout(paperPreset, {
+    size: 'A4',
+    orientation: 'portrait',
+    marginMm: 10,
+  });
 
   return (
     <div className="space-y-4">
@@ -56,11 +64,12 @@ export const LabelRuangView: React.FC<LabelRuangViewProps> = ({
 
       <PrintToolbar
         title="Label Pintu Ruang Ujian"
-        paperSize={paperPreset?.size || 'A4'}
-        orientation={paperPreset?.orientation || 'portrait'}
+        layout={layout}
+        onLayoutChange={setLayout}
+        onSaveLayout={onSavePreset}
       />
 
-      <div className="overflow-x-auto pb-8">
+      <div className="overflow-x-auto pb-8 print:overflow-visible print:pb-0">
         <LabelRuangCetak
           profile={profile}
           examConfig={examConfig}
@@ -68,7 +77,7 @@ export const LabelRuangView: React.FC<LabelRuangViewProps> = ({
           students={students}
           physicalClassrooms={physicalClassrooms}
           selectedRoomId={selectedRoomId}
-          paperPreset={paperPreset}
+          paperPreset={layout}
         />
       </div>
     </div>

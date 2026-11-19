@@ -9,6 +9,7 @@ import {
 } from '../../types';
 import { KopSurat } from './KopSurat';
 import { computeClassRangesInRoom } from '../../utils/seating';
+import { getSheetScreenStyle } from '../../utils/printLayout';
 
 interface LabelRuangCetakProps {
   profile: MadrasahProfile;
@@ -33,8 +34,17 @@ export const LabelRuangCetak: React.FC<LabelRuangCetakProps> = ({
     (r) => !selectedRoomId || selectedRoomId === 'all' || r.id === selectedRoomId
   );
 
-  const isF4 = paperPreset?.size === 'F4';
-  const sheetClass = isF4 ? 'w-[215mm] min-h-[330mm]' : 'w-[210mm] min-h-[297mm]';
+  const sheetStyle = getSheetScreenStyle(paperPreset);
+
+  if (activeRooms.length === 0) {
+    return (
+      <div className="p-8 text-center bg-white rounded-xl border border-slate-200">
+        <p className="text-slate-500 font-medium">
+          Belum ada ruang ujian yang dapat dicetak labelnya.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full flex flex-col items-center">
@@ -54,7 +64,8 @@ export const LabelRuangCetak: React.FC<LabelRuangCetakProps> = ({
         return (
           <div
             key={`label-ruang-${room.id}`}
-            className={`${sheetClass} p-[12mm] bg-white text-slate-900 border border-slate-300 shadow-sm print:border-none print:shadow-none print:p-0 print-page-break mb-8 print:mb-0 flex flex-col justify-between`}
+            style={sheetStyle}
+            className="saum-sheet border border-slate-300 shadow-sm print-page-break mb-8 print:mb-0 flex flex-col justify-between"
           >
             <div>
               {(paperPreset?.showKop ?? true) && <KopSurat profile={profile} />}

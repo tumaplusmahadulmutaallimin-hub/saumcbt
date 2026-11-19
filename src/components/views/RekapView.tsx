@@ -28,6 +28,7 @@ import {
 } from '../../types';
 import { RekapKebutuhanCetak } from '../documents/RekapKebutuhanCetak';
 import { PrintToolbar } from '../documents/PrintToolbar';
+import { usePrintLayout } from '../../utils/printLayout';
 import { formatDayAndDate } from '../../utils/qrBarcode';
 import {
   computeEquipmentTotals,
@@ -49,6 +50,7 @@ interface RekapViewProps {
   paperPreset?: PaperPreset;
   canEdit: boolean;
   onSaveRekap: (rekapConfig: RekapConfig, auditDetail?: string) => Promise<void>;
+  onSavePreset?: (preset: PaperPreset) => Promise<void>;
 }
 
 export const RekapView: React.FC<RekapViewProps> = ({
@@ -64,7 +66,13 @@ export const RekapView: React.FC<RekapViewProps> = ({
   paperPreset,
   canEdit,
   onSaveRekap,
+  onSavePreset,
 }) => {
+  const { layout, setLayout } = usePrintLayout(paperPreset, {
+    size: 'A4',
+    orientation: 'portrait',
+    marginMm: 10,
+  });
   const [activeTab, setActiveTab] = useState<'perlengkapan' | 'penggandaan' | 'cetak'>('perlengkapan');
   const [localRekap, setLocalRekap] = useState<RekapConfig>({
     ...rekapConfig,
@@ -526,47 +534,55 @@ export const RekapView: React.FC<RekapViewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 tabular-nums">
-                  {roomEquipmentRows.map((row) => (
-                    <tr key={row.room.id} className="hover:bg-slate-50/70">
-                      <td className="px-3 py-2.5 font-bold text-slate-900">{row.room.namaRuang}</td>
-                      <td className="px-3 py-2.5 text-center">
-                        {isOnline ? (
-                          <span>
-                            <span className="font-semibold">{row.totalPesertaTerdaftar}</span> /{' '}
-                            <span className="font-bold text-emerald-700">{row.pesertaSerentak} per sesi</span>
-                          </span>
-                        ) : (
-                          <span>
-                            <span className="font-semibold">{row.room.kapasitas}</span> /{' '}
-                            <span className="font-bold text-emerald-700">{row.totalPesertaTerdaftar}</span>
-                          </span>
-                        )}
+                  {roomEquipmentRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
+                        Belum ada ruang ujian. Atur ruang di menu Pembagian Ruang &amp; Sesi untuk menghitung kebutuhan meja dan kursi.
                       </td>
-                      <td className="px-3 py-2.5 text-center font-extrabold text-emerald-800">
-                        {row.kursiPeserta}
-                      </td>
-                      <td className="px-3 py-2.5 text-center font-bold text-slate-900">
-                        {row.mejaPeserta}
-                      </td>
-                      <td className="px-3 py-2.5 text-center font-semibold text-emerald-800">
-                        {row.kursiPengawas}
-                      </td>
-                      <td className="px-3 py-2.5 text-center">{row.mejaPengawas}</td>
-                      <td className="px-3 py-2.5 text-center font-semibold text-blue-800">
-                        {kursiPerMeja === 2
-                          ? `${row.labelMejaFisik} Meja (${row.labelPesertaDuduk} Peserta)`
-                          : row.labelPesertaDuduk}
-                      </td>
-                      <td className="px-3 py-2.5 text-center text-slate-600">
-                        {row.denahDuduk} Denah / {row.labelPintu} Pintu
-                      </td>
-                      {isOnline && (
-                        <td className="px-3 py-2.5 text-center font-semibold text-emerald-800">
-                          {row.boxHp} Box / {row.stopKontak} Terminal
-                        </td>
-                      )}
                     </tr>
-                  ))}
+                  ) : (
+                    roomEquipmentRows.map((row) => (
+                      <tr key={row.room.id} className="hover:bg-slate-50/70">
+                        <td className="px-3 py-2.5 font-bold text-slate-900">{row.room.namaRuang}</td>
+                        <td className="px-3 py-2.5 text-center">
+                          {isOnline ? (
+                            <span>
+                              <span className="font-semibold">{row.totalPesertaTerdaftar}</span> /{' '}
+                              <span className="font-bold text-emerald-700">{row.pesertaSerentak} per sesi</span>
+                            </span>
+                          ) : (
+                            <span>
+                              <span className="font-semibold">{row.room.kapasitas}</span> /{' '}
+                              <span className="font-bold text-emerald-700">{row.totalPesertaTerdaftar}</span>
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 text-center font-extrabold text-emerald-800">
+                          {row.kursiPeserta}
+                        </td>
+                        <td className="px-3 py-2.5 text-center font-bold text-slate-900">
+                          {row.mejaPeserta}
+                        </td>
+                        <td className="px-3 py-2.5 text-center font-semibold text-emerald-800">
+                          {row.kursiPengawas}
+                        </td>
+                        <td className="px-3 py-2.5 text-center">{row.mejaPengawas}</td>
+                        <td className="px-3 py-2.5 text-center font-semibold text-blue-800">
+                          {kursiPerMeja === 2
+                            ? `${row.labelMejaFisik} Meja (${row.labelPesertaDuduk} Peserta)`
+                            : row.labelPesertaDuduk}
+                        </td>
+                        <td className="px-3 py-2.5 text-center text-slate-600">
+                          {row.denahDuduk} Denah / {row.labelPintu} Pintu
+                        </td>
+                        {isOnline && (
+                          <td className="px-3 py-2.5 text-center font-semibold text-emerald-800">
+                            {row.boxHp} Box / {row.stopKontak} Terminal
+                          </td>
+                        )}
+                      </tr>
+                    ))
+                  )}
                   <tr className="bg-emerald-50/60 font-extrabold text-slate-950 border-t-2 border-slate-300">
                     <td className="px-3 py-3">TOTAL KEBUTUHAN RUANG</td>
                     <td className="px-3 py-3 text-center">
@@ -704,6 +720,13 @@ export const RekapView: React.FC<RekapViewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
+                  {localRekap.customSupplies.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-6 text-center text-slate-400">
+                        Belum ada daftar perlengkapan tambahan. Klik "Sesuaikan Perlengkapan dengan Jumlah &amp; Moda" atau tambah manual di atas.
+                      </td>
+                    </tr>
+                  ) : null}
                   {localRekap.customSupplies.map((item, idx) => {
                     const kurang = Math.max(0, item.kebutuhan - item.tersedia);
                     return (
@@ -871,6 +894,13 @@ export const RekapView: React.FC<RekapViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 tabular-nums">
+                {duplicationRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
+                      Belum ada kombinasi jadwal dan ruang ujian yang tersedia untuk dipantau penggandaannya.
+                    </td>
+                  </tr>
+                ) : null}
                 {duplicationRows.map((row) => (
                   <tr key={row.key} className="hover:bg-slate-50/70">
                     <td className="px-3 py-2.5">
@@ -961,10 +991,11 @@ export const RekapView: React.FC<RekapViewProps> = ({
             title="Cetak Rekap Perlengkapan & Kebutuhan Penggandaan"
             onBack={() => setActiveTab('perlengkapan')}
             onExportExcel={handleExportExcel}
-            paperSize={paperPreset?.size || 'A4'}
-            orientation="portrait"
+            layout={layout}
+            onLayoutChange={setLayout}
+            onSaveLayout={onSavePreset}
           />
-          <div className="overflow-x-auto pb-8">
+          <div className="overflow-x-auto pb-8 print:overflow-visible print:pb-0">
             <RekapKebutuhanCetak
               profile={profile}
               examConfig={examConfig}
@@ -973,7 +1004,7 @@ export const RekapView: React.FC<RekapViewProps> = ({
               schedules={schedules}
               subjects={subjects}
               rekapConfig={localRekap}
-              paperPreset={paperPreset}
+              paperPreset={layout}
             />
           </div>
         </div>

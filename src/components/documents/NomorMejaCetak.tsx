@@ -9,6 +9,7 @@ import {
 } from '../../types';
 import { KopSurat } from './KopSurat';
 import { SimpleQRCode, formatIndonesianDate } from '../../utils/qrBarcode';
+import { getCardGridMetrics, getSheetScreenStyle } from '../../utils/printLayout';
 
 export type NomorMejaPrintStyle =
   | 'label_lengkap'
@@ -27,6 +28,7 @@ interface NomorMejaCetakProps {
   printStyle?: NomorMejaPrintStyle;
   kursiPerMeja?: number;
   paperPreset?: PaperPreset;
+  cardsPerPage?: 4 | 6;
 }
 
 export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
@@ -40,16 +42,21 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
   printStyle = 'label_lengkap',
   kursiPerMeja = 2,
   paperPreset,
+  cardsPerPage,
 }) => {
   const roomMap = new Map(rooms.map((r) => [r.id, r]));
   const isOnline = examConfig?.moda === 'online';
   const barcodeMode = numberingConfig?.barcodeMode || 'auto';
   const ratio = kursiPerMeja === 1 ? 1 : 2;
 
-  const isF4 = paperPreset?.size === 'F4';
-  const sheetClass = isF4 ? 'w-[215mm] min-h-[330mm]' : 'w-[210mm] min-h-[297mm]';
+  const metrics = getCardGridMetrics(paperPreset, {
+    defaultSize: 'F4',
+    defaultCardsPerPage: cardsPerPage || 6,
+    gapMm: 4,
+  });
+  const sheetStyle = getSheetScreenStyle(metrics.resolved);
 
-  let filteredStudents = students
+  const filteredStudents = students
     .filter((s) => s.status === 'Aktif')
     .filter((s) => !selectedRoomId || selectedRoomId === 'all' || s.ruangId === selectedRoomId)
     .filter((s) => !isOnline || !selectedSesi || selectedSesi === 0 || (s.sesi || 1) === selectedSesi)
@@ -67,12 +74,14 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
   if (filteredStudents.length === 0) {
     return (
       <div className="p-8 text-center bg-white rounded-xl border border-slate-200">
-        <p className="text-slate-500 font-medium">Tidak ada peserta aktif untuk dicetak nomor mejanya.</p>
+        <p className="text-slate-500 font-medium">
+          Tidak ada peserta aktif untuk dicetak nomor mejanya. Tambahkan peserta dan atur penomoran terlebih dahulu.
+        </p>
       </div>
     );
   }
 
-  // 1. FORMAT BERPASANGAN: 1 MEJA = 2 KURSI
+  // 1. FORMAT BERPASANGAN: 1 MEJA = 2 KURSI (6 Meja Fisik / Lembar)
   if (printStyle === 'berpasangan_2kursi') {
     interface DeskPair {
       key: string;
@@ -84,7 +93,6 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
     }
 
     const pairs: DeskPair[] = [];
-    // Group by (ruangId, sesi) so desk 01 always starts fresh per room/session
     const groupMap = new Map<string, Student[]>();
     for (const st of filteredStudents) {
       const gKey = `${st.ruangId || 'unassigned'}__${isOnline ? st.sesi || 1 : 0}`;
@@ -109,6 +117,7 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
     });
 
     const chunkSize = 6;
+    const rowHeightMm = Math.floor(((metrics.printableHeightMm - 4 * 5 - 2) / 6) * 10) / 10;
     const pages: DeskPair[][] = [];
     for (let i = 0; i < pairs.length; i += chunkSize) {
       pages.push(pairs.slice(i, i + chunkSize));
@@ -119,18 +128,20 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
         {pages.map((pagePairs, pageIdx) => (
           <div
             key={pageIdx}
-            className={`${sheetClass} p-[10mm] bg-white text-slate-900 border border-slate-300 shadow-sm print:border-none print:shadow-none print:p-0 ${
+            style={sheetStyle}
+            className={`saum-sheet border border-slate-300 shadow-sm ${
               pageIdx < pages.length - 1 ? 'print-page-break mb-8 print:mb-0' : ''
             }`}
           >
-            <div className="grid grid-cols-1 gap-[4.5mm]">
+            <div className="grid grid-cols-1 gap-[4mm]">
               {pagePairs.map((pair) => {
                 const mejaLabel = String(pair.mejaFisikNo).padStart(2, '0');
                 return (
                   <div
                     key={pair.key}
-                    className="border-2 border-dashed border-slate-800 rounded-lg p-2.5 bg-white flex flex-col justify-between"
-                    style={{ minHeight: '42mm' }}
+                    data-testid="nomor-meja-card"
+                    className="border-2 border-dashed border-slate-800 rounded-lg p-2.5 bg-white flex flex-col justify-between print-avoid-break overflow-hidden"
+                    style={{ height: `${rowHeightMm}mm` }}
                   >
                     <div className="border-b-2 border-emerald-800 pb-1 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
@@ -143,12 +154,12 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
                             {isOnline && pair.sesi ? ` • SESI ${pair.sesi}` : ''} • 1 MEJA (2 KURSI)
                           </p>
                           <p className="text-[7.5px] font-semibold text-slate-500 truncate">
-                            {profile.namaMadrasah} — {profile.jenisUjian}
+                            {profile.namaMadrasah || 'Madrasah'} — {examConfig?.namaUjian || profile.jenisUjian || 'Ujian Madrasah'}
                           </p>
                         </div>
                       </div>
                       <span className="text-[8px] font-mono font-bold text-slate-600 shrink-0">
-                        TP {profile.tahunPelajaran}
+                        TP {profile.tahunPelajaran || '-'}
                       </span>
                     </div>
 
@@ -180,8 +191,13 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
                                     {slot.st.nama}
                                   </p>
                                   <p className="text-[8px] text-slate-700 font-semibold">
-                                    Kelas {slot.st.kelas} ({slot.st.jenisKelamin}) • NIS {slot.st.nis}
+                                    Kelas {slot.st.kelas} ({slot.st.jenisKelamin}) • NIS {slot.st.nis || '-'}
                                   </p>
+                                  {slot.st.usernameUjian && (
+                                    <p className="text-[7.5px] font-mono text-emerald-950 font-bold truncate">
+                                      User: {slot.st.usernameUjian} • Pass: {slot.st.passwordUjian || '-'}
+                                    </p>
+                                  )}
                                 </div>
                                 <div className="shrink-0">
                                   {slot.st.barcodeUrl || (barcodeMode === 'uploaded' && uploadedBarcode) ? (
@@ -217,9 +233,13 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
     );
   }
 
-  // 2. FORMAT KARTU ANGKA MEJA BESAR (6 per halaman A4)
+  // 2. FORMAT KARTU ANGKA MEJA BESAR (6 kartu per halaman 2 kolom x 3 baris)
   if (printStyle === 'kartu_angka_besar') {
     const chunkSize = 6;
+    const gridMetrics = getCardGridMetrics(
+      { ...metrics.resolved, cardsPerPage: 6 },
+      { defaultSize: 'F4', defaultCardsPerPage: 6, gapMm: 4 }
+    );
     const pages: Student[][] = [];
     for (let i = 0; i < filteredStudents.length; i += chunkSize) {
       pages.push(filteredStudents.slice(i, i + chunkSize));
@@ -230,11 +250,12 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
         {pages.map((pageStudents, pageIdx) => (
           <div
             key={pageIdx}
-            className={`${sheetClass} p-[10mm] bg-white text-slate-900 border border-slate-300 shadow-sm print:border-none print:shadow-none print:p-0 ${
+            style={sheetStyle}
+            className={`saum-sheet border border-slate-300 shadow-sm ${
               pageIdx < pages.length - 1 ? 'print-page-break mb-8 print:mb-0' : ''
             }`}
           >
-            <div className="grid grid-cols-2 gap-[6mm]">
+            <div className="grid grid-cols-2 gap-[4mm]">
               {pageStudents.map((st, idx) => {
                 const room = st.ruangId ? roomMap.get(st.ruangId) : undefined;
                 const seatNum = st.nomorMeja || idx + 1;
@@ -243,17 +264,21 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
                 return (
                   <div
                     key={st.id}
-                    className="border-2 border-slate-900 rounded-xl p-3 bg-white flex flex-col justify-between text-center"
-                    style={{ minHeight: '86mm' }}
+                    data-testid="nomor-meja-card"
+                    className="border-2 border-slate-900 rounded-xl p-3 bg-white flex flex-col justify-between text-center print-avoid-break overflow-hidden"
+                    style={{ height: `${gridMetrics.cardHeightMm}mm` }}
                   >
                     <div className="border-b-2 border-emerald-800 pb-1.5">
-                      <p className="text-[8px] font-bold uppercase text-slate-500 truncate">{profile.namaMadrasah}</p>
-                      <p className="text-[10px] font-extrabold uppercase text-emerald-900">
-                        {profile.jenisUjian} • TP {profile.tahunPelajaran}
+                      <p className="text-[8px] font-bold uppercase text-slate-500 truncate">
+                        {profile.namaMadrasah || 'MADRASAH'}
+                      </p>
+                      <p className="text-[10px] font-extrabold uppercase text-emerald-900 truncate">
+                        {examConfig?.namaUjian || profile.jenisUjian || 'UJIAN MADRASAH'} • TP{' '}
+                        {profile.tahunPelajaran || '-'}
                       </p>
                     </div>
 
-                    <div className="my-auto py-2">
+                    <div className="my-auto py-1.5">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
                         NOMOR KURSI / DUDUK
                       </p>
@@ -291,14 +316,15 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
   if (printStyle === 'daftar_meja') {
     return (
       <div className="w-full flex flex-col items-center">
-        <div className={`${sheetClass} p-[10mm] bg-white text-slate-900 border border-slate-300 shadow-sm print:border-none print:shadow-none print:p-0`}>
-          {(paperPreset?.showKop ?? true) && <KopSurat profile={profile} isCompact />}
+        <div style={sheetStyle} className="saum-sheet border border-slate-300 shadow-sm">
+          {(metrics.resolved.showKop ?? true) && <KopSurat profile={profile} isCompact />}
           <div className="text-center my-3">
             <h2 className="text-sm font-extrabold uppercase font-serif tracking-wide underline">
               DAFTAR PENOMORAN MEJA & KURSI PESERTA UJIAN
             </h2>
             <p className="text-xs font-semibold uppercase mt-0.5">
-              {examConfig?.namaUjian || profile.jenisUjian} • TAHUN PELAJARAN {profile.tahunPelajaran}
+              {examConfig?.namaUjian || profile.jenisUjian || 'UJIAN MADRASAH'} • TAHUN PELAJARAN{' '}
+              {profile.tahunPelajaran || '-'}
               {ratio === 2 ? ' • KONFIGURASI 1 MEJA = 2 KURSI' : ''}
             </p>
           </div>
@@ -309,10 +335,12 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
                 <th className="border border-slate-900 px-1.5 py-1.5 w-8">No</th>
                 <th className="border border-slate-900 px-2 py-1.5 w-20">No. Kursi</th>
                 {ratio === 2 && <th className="border border-slate-900 px-2 py-1.5 w-20">Meja Fisik</th>}
-                <th className="border border-slate-900 px-2 py-1.5 w-28">No. Peserta</th>
+                <th className="border border-slate-900 px-2 py-1.5 w-24">No. Peserta</th>
+                <th className="border border-slate-900 px-2 py-1.5 w-20">User Ujian</th>
+                <th className="border border-slate-900 px-2 py-1.5 w-16">Password</th>
                 <th className="border border-slate-900 px-2 py-1.5 text-left">Nama Lengkap Peserta</th>
-                <th className="border border-slate-900 px-1.5 py-1.5 w-16">Kelas</th>
-                <th className="border border-slate-900 px-2 py-1.5 w-24">Ruang</th>
+                <th className="border border-slate-900 px-1.5 py-1.5 w-14">Kelas</th>
+                <th className="border border-slate-900 px-2 py-1.5 w-20">Ruang</th>
                 {isOnline && <th className="border border-slate-900 px-1.5 py-1.5 w-14">Sesi</th>}
               </tr>
             </thead>
@@ -332,10 +360,20 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
                         MEJA {String(mejaFisik).padStart(2, '0')}
                       </td>
                     )}
-                    <td className="border border-slate-900 px-2 py-1 text-center font-mono">{st.nomorPeserta || '-'}</td>
+                    <td className="border border-slate-900 px-2 py-1 text-center font-mono">
+                      {st.nomorPeserta || '-'}
+                    </td>
+                    <td className="border border-slate-900 px-2 py-1 text-center font-mono font-bold">
+                      {st.usernameUjian || '-'}
+                    </td>
+                    <td className="border border-slate-900 px-2 py-1 text-center font-mono">
+                      {st.passwordUjian || '-'}
+                    </td>
                     <td className="border border-slate-900 px-2 py-1 font-semibold uppercase">{st.nama}</td>
                     <td className="border border-slate-900 px-1.5 py-1 text-center">{st.kelas}</td>
-                    <td className="border border-slate-900 px-2 py-1 text-center">{room ? room.namaRuang : '-'}</td>
+                    <td className="border border-slate-900 px-2 py-1 text-center">
+                      {room ? room.namaRuang : '-'}
+                    </td>
                     {isOnline && (
                       <td className="border border-slate-900 px-1.5 py-1 text-center font-bold">
                         Sesi {st.sesi || 1}
@@ -350,12 +388,17 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
           <div className="flex justify-end text-[11px] font-serif mt-4 px-4">
             <div className="text-center w-56 leading-tight">
               <p>
-                {profile.tempatTandaTangan}, {formatIndonesianDate(profile.tanggalSurat)}
+                {profile.tempatTandaTangan ? `${profile.tempatTandaTangan}, ` : ''}
+                {formatIndonesianDate(profile.tanggalSurat)}
               </p>
               <p className="font-bold">Ketua Panitia Ujian,</p>
               <div className="h-14" />
-              <p className="font-bold underline uppercase">{profile.namaKetuaPanitia || profile.namaKepala}</p>
-              <p className="text-[9.5px] font-sans">NIP. {profile.nipKetuaPanitia || profile.nipKepala || '-'}</p>
+              <p className="font-bold underline uppercase">
+                {profile.namaKetuaPanitia || profile.namaKepala || '.........................'}
+              </p>
+              <p className="text-[9.5px] font-sans">
+                NIP. {profile.nipKetuaPanitia || profile.nipKepala || '-'}
+              </p>
             </div>
           </div>
         </div>
@@ -363,8 +406,8 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
     );
   }
 
-  // 4. DEFAULT: LABEL NOMOR MEJA & DATA PESERTA LENGKAP (8 per halaman A4)
-  const chunkSize = 8;
+  // 4. DEFAULT: LABEL NOMOR MEJA & DATA PESERTA LENGKAP (6 kartu per lembar F4 = 2 kolom x 3 baris)
+  const chunkSize = metrics.cardsPerPage;
   const pages: Student[][] = [];
   for (let i = 0; i < filteredStudents.length; i += chunkSize) {
     pages.push(filteredStudents.slice(i, i + chunkSize));
@@ -375,60 +418,68 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
       {pages.map((pageStudents, pageIdx) => (
         <div
           key={pageIdx}
-          className={`${sheetClass} p-[10mm] bg-white text-slate-900 border border-slate-300 shadow-sm print:border-none print:shadow-none print:p-0 ${
+          style={sheetStyle}
+          className={`saum-sheet border border-slate-300 shadow-sm ${
             pageIdx < pages.length - 1 ? 'print-page-break mb-8 print:mb-0' : ''
           }`}
         >
-          <div className="grid grid-cols-2 gap-[4.5mm]">
+          <div className="grid grid-cols-2 gap-[4mm]">
             {pageStudents.map((st) => {
               const room = st.ruangId ? roomMap.get(st.ruangId) : undefined;
               const uploadedBarcode = st.barcodeUrl || numberingConfig?.uploadedBarcodeUrl;
               const effectiveLink = (st.customLink || numberingConfig?.manualLinkUrl || '').trim();
               const seatNo = st.nomorMeja || 0;
               const deskText = seatNo ? String(seatNo).padStart(2, '0') : '-';
-              const mejaFisik = seatNo && ratio === 2 ? String(Math.ceil(seatNo / 2)).padStart(2, '0') : deskText;
+              const mejaFisik =
+                seatNo && ratio === 2 ? String(Math.ceil(seatNo / 2)).padStart(2, '0') : deskText;
 
               return (
                 <div
                   key={st.id}
-                  className="border-2 border-dashed border-slate-800 rounded-lg p-2.5 bg-white flex flex-col justify-between"
-                  style={{ minHeight: '64mm' }}
+                  data-testid="nomor-meja-card"
+                  className="border-2 border-dashed border-slate-800 rounded-lg p-3 bg-white flex flex-col justify-between print-avoid-break overflow-hidden"
+                  style={{ height: `${metrics.cardHeightMm}mm` }}
                 >
-                  <div className="border-b-2 border-emerald-800 pb-1 flex items-center justify-between gap-2">
+                  <div className="border-b-2 border-emerald-800 pb-1.5 flex items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-[7.5px] font-bold text-slate-500 uppercase truncate">{profile.namaMadrasah}</p>
-                      <h4 className="text-[9.5px] font-extrabold text-emerald-900 uppercase leading-tight">
-                        LABEL NOMOR MEJA & KURSI UJIAN
+                      <p className="text-[8px] font-bold text-slate-500 uppercase truncate">
+                        {profile.namaMadrasah || 'MADRASAH'}
+                      </p>
+                      <h4 className="text-[10.5px] font-extrabold text-emerald-900 uppercase leading-tight">
+                        NOMOR MEJA & KURSI UJIAN
                       </h4>
                     </div>
-                    <div className="bg-emerald-800 text-white font-mono font-extrabold text-[11px] px-2 py-0.5 rounded shrink-0 text-center">
+                    <div className="bg-emerald-800 text-white font-mono font-extrabold text-[12px] px-2.5 py-1 rounded shrink-0 text-center">
                       <span>{ratio === 2 ? `MEJA ${mejaFisik} / K.${deskText}` : `MEJA ${deskText}`}</span>
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-2.5 my-1.5">
-                    <div className="flex-1 min-w-0 space-y-0.5">
-                      <div className="text-[12.5px] font-black font-mono tracking-wider text-slate-950 bg-slate-100 px-2 py-0.5 rounded border border-slate-300">
+                  <div className="flex items-center gap-3 my-auto py-1.5">
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="text-[13px] font-black font-mono tracking-wider text-slate-950 bg-slate-100 px-2 py-1 rounded border border-slate-300">
                         {st.nomorPeserta || '-'}
                       </div>
-                      <p className="text-[10.5px] font-extrabold uppercase text-slate-950 truncate pt-0.5">
+                      <p className="text-[11px] font-extrabold uppercase text-slate-950 truncate pt-0.5">
                         {st.nama}
                       </p>
                       <p className="text-[8.5px] text-slate-700 font-mono">
-                        NIS/NISN: <b className="text-slate-950">{st.nis} / {st.nisn}</b>
+                        NIS/NISN: <b className="text-slate-950">{st.nis || '-'} / {st.nisn || '-'}</b>
                       </p>
                       <p className="text-[8.5px] text-slate-700 truncate">
-                        TTL: {st.tempatLahir}, {formatIndonesianDate(st.tanggalLahir)}
+                        TTL: {st.tempatLahir || '-'}, {formatIndonesianDate(st.tanggalLahir)}
                       </p>
-                      <p className="text-[8.5px] text-slate-700 font-semibold">
+                      <p className="text-[9px] text-slate-700 font-semibold">
                         Kelas: <b className="text-slate-950">{st.kelas}</b> ({st.jenisKelamin}) •{' '}
                         <span className="text-emerald-900 font-extrabold">
                           {room ? room.namaRuang : '-'}
                           {isOnline || st.sesi ? ` / Sesi ${st.sesi || 1}` : ''}
                         </span>
                       </p>
+                      <p className="text-[8.5px] font-mono text-slate-900 bg-emerald-50 print:bg-slate-100 border border-emerald-200 print:border-slate-300 rounded px-1.5 py-0.5 truncate">
+                        User: <b>{st.usernameUjian || '-'}</b> &bull; Pass: <b>{st.passwordUjian || '-'}</b>
+                      </p>
                       {effectiveLink && (
-                        <p className="text-[7.5px] font-mono text-blue-900 truncate">
+                        <p className="text-[8px] font-mono text-blue-900 truncate">
                           Link: {effectiveLink}
                         </p>
                       )}
@@ -439,23 +490,29 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
                         <img
                           src={uploadedBarcode}
                           alt={`Barcode ${st.nomorPeserta || st.nama}`}
-                          className="h-[52px] max-w-[82px] object-contain border border-slate-200 rounded p-0.5 bg-white"
+                          className="h-[58px] max-w-[86px] object-contain border border-slate-200 rounded p-0.5 bg-white"
                         />
                       ) : (
                         <SimpleQRCode
-                          value={effectiveLink || `${st.nomorPeserta}|${st.nama}|${st.kelas}|Meja-${deskText}`}
-                          size={54}
+                          value={
+                            effectiveLink ||
+                            `${st.nomorPeserta}|${st.nama}|${st.kelas}|Meja-${deskText}`
+                          }
+                          size={58}
                         />
                       )}
-                      <span className="text-[7px] font-mono text-slate-500 mt-0.5">
-                        {room ? `R.${room.nomorRuang}` : ''} / K.{deskText}
+                      <span className="text-[7.5px] font-mono text-slate-600 font-bold mt-1">
+                        {room ? `R.${room.nomorRuang}` : 'Ruang -'} / Kursi {deskText}
                       </span>
                     </div>
                   </div>
 
-                  <div className="border-t border-slate-200 pt-1 flex justify-between items-center text-[7px] text-slate-500">
-                    <span className="font-semibold">{profile.jenisUjian} • TP {profile.tahunPelajaran}</span>
-                    <span className="italic">* Ditempel di meja ujian peserta</span>
+                  <div className="border-t border-slate-200 pt-1.5 flex justify-between items-center text-[7.5px] text-slate-500">
+                    <span className="font-semibold truncate">
+                      {examConfig?.namaUjian || profile.jenisUjian || 'Ujian Madrasah'} • TP{' '}
+                      {profile.tahunPelajaran || '-'}
+                    </span>
+                    <span className="italic shrink-0">* Tempel di meja ujian</span>
                   </div>
                 </div>
               );

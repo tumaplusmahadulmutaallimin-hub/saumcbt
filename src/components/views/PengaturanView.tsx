@@ -10,6 +10,8 @@ import {
   Trash2,
   CheckCircle2,
   Printer,
+  RotateCcw,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   AuditLogEntry,
@@ -32,6 +34,7 @@ interface PengaturanViewProps {
   auditLogs: AuditLogEntry[];
   currentUser: UserAccount;
   canEdit: boolean;
+  initialTab?: 'madrasah_kop' | 'kertas' | 'panitia' | 'akses';
   onSaveSettings: (payload: {
     profile?: MadrasahProfile;
     paperPresets?: PaperPreset[];
@@ -40,6 +43,7 @@ interface PengaturanViewProps {
   }) => Promise<void>;
   onSwitchUser: (username: string) => Promise<void>;
   onNavigateToPrintSk: () => void;
+  onResetClean?: () => Promise<void>;
 }
 
 export const PengaturanView: React.FC<PengaturanViewProps> = ({
@@ -50,13 +54,18 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
   auditLogs,
   currentUser,
   canEdit,
+  initialTab = 'madrasah_kop',
   onSaveSettings,
   onSwitchUser,
   onNavigateToPrintSk,
+  onResetClean,
 }) => {
-  const [activeTab, setActiveTab] = useState<'madrasah_kop' | 'kertas' | 'panitia' | 'akses'>('madrasah_kop');
+  const [activeTab, setActiveTab] = useState<'madrasah_kop' | 'kertas' | 'panitia' | 'akses'>(initialTab);
   const [localProfile, setLocalProfile] = useState<MadrasahProfile>(profile);
   const [localPresets, setLocalPresets] = useState<PaperPreset[]>(paperPresets);
+  const [localUsers, setLocalUsers] = useState<UserAccount[]>(users);
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const [newMember, setNewMember] = useState<Partial<CommitteeMember>>({
     nama: '',
     nip: '',
@@ -68,6 +77,11 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
   const [notice, setNotice] = useState('');
   const kopFileRef = useRef<HTMLInputElement>(null);
   const logoMadrasahRef = useRef<HTMLInputElement>(null);
+  const logoKemenagRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   useEffect(() => {
     setLocalProfile(profile);
@@ -77,11 +91,15 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
     setLocalPresets(paperPresets);
   }, [paperPresets]);
 
+  useEffect(() => {
+    setLocalUsers(users);
+  }, [users]);
+
   const canManageUsers = canRoleEdit(currentUser.role, 'users_roles');
 
   const handleUploadImage = (
     e: React.ChangeEvent<HTMLInputElement>,
-    field: 'kopImageUrl' | 'logoMadrasahUrl'
+    field: 'kopImageUrl' | 'logoMadrasahUrl' | 'logoKemenagUrl'
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -92,6 +110,8 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
           ...prev,
           [field]: reader.result as string,
           useOriginalKopImage: field === 'kopImageUrl' ? true : prev.useOriginalKopImage,
+          showLogoKemenag: field === 'logoKemenagUrl' ? true : prev.showLogoKemenag,
+          showLogoMadrasah: field === 'logoMadrasahUrl' ? true : prev.showLogoMadrasah,
         }));
       }
     };
@@ -102,7 +122,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
   const handleSaveMadrasahKop = async (e: React.FormEvent) => {
     e.preventDefault();
     await onSaveSettings({ profile: localProfile });
-    setNotice('Identitas madrasah dan KOP surat berhasil disimpan.');
+    setNotice('Identitas madrasah, logo Kemenag/Madrasah, dan KOP surat berhasil disimpan.');
   };
 
   const handleSavePresets = async () => {
@@ -132,9 +152,27 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
   };
 
   const handleUpdateUserRole = async (userId: string, role: UserRole) => {
-    const updated = users.map((u) => (u.id === userId ? { ...u, role } : u));
+    const updated = localUsers.map((u) => (u.id === userId ? { ...u, role } : u));
+    setLocalUsers(updated);
     await onSaveSettings({ users: updated });
     setNotice('Hak akses pengguna diperbarui.');
+  };
+
+  const handleSaveUsers = async () => {
+    await onSaveSettings({ users: localUsers });
+    setNotice('Profil nama & jabatan akun pengguna berhasil disimpan.');
+  };
+
+  const handleConfirmResetClean = async () => {
+    if (!onResetClean) return;
+    setIsResetting(true);
+    try {
+      await onResetClean();
+      setConfirmResetOpen(false);
+      setNotice('Seluruh data ujian telah dibersihkan. Aplikasi siap diisi data madrasah resmi.');
+    } finally {
+      setIsResetting(false);
+    }
   };
 
   return (
@@ -150,7 +188,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
 
       <div className="flex flex-wrap gap-2 text-xs">
         {[
-          { id: 'madrasah_kop', label: 'Identitas & KOP Asli', icon: Building2 },
+          { id: 'madrasah_kop', label: 'Logo, KOP Surat & Identitas', icon: Building2 },
           { id: 'kertas', label: 'Kertas & Margin (A4/F4)', icon: FileSpreadsheet },
           { id: 'panitia', label: `Panitia Ujian (${committee.length})`, icon: Users },
           { id: 'akses', label: 'Pengguna, Peran & Audit Log', icon: Shield },
@@ -178,137 +216,375 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
         </div>
       )}
 
-      {/* Tab 1: Madrasah & Original KOP Upload */}
+      {/* Tab 1: Logo Kemenag/Madrasah, Isian KOP & Identitas */}
       {activeTab === 'madrasah_kop' && (
         <form onSubmit={handleSaveMadrasahKop} className="space-y-6">
-          <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4 text-xs">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <ImageIcon className="w-4 h-4 text-emerald-700" /> Upload & Pengaturan KOP Surat Asli (JPG/PNG)
-            </h3>
-            <div className="flex flex-wrap items-center gap-4">
-              <label className="inline-flex items-center gap-2 font-bold text-slate-800 cursor-pointer">
-                <input
-                  type="checkbox"
-                  disabled={!canEdit}
-                  checked={Boolean(localProfile.useOriginalKopImage)}
-                  onChange={(e) =>
-                    setLocalProfile({ ...localProfile, useOriginalKopImage: e.target.checked })
-                  }
-                />
-                Gunakan Gambar KOP Asli Madrasah (tanpa crop / overlay teks)
-              </label>
-
+          {/* Card 1: Pengaturan KOP Surat, Logo Kemenag & Logo Madrasah */}
+          <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-5 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4 text-emerald-700" /> Pengaturan Logo Kemenag, Logo Madrasah &amp; Isian KOP
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Atur tampilan logo kiri (Kemenag), logo kanan (Madrasah), teks isian KOP surat, atau unggah gambar KOP utuh.
+                </p>
+              </div>
               {canEdit && (
-                <>
-                  <input
-                    ref={kopFileRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    onChange={(e) => handleUploadImage(e, 'kopImageUrl')}
-                    className="hidden"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => kopFileRef.current?.click()}
-                    className="px-3 py-1.5 font-semibold bg-slate-800 text-white rounded-lg cursor-pointer"
-                  >
-                    Upload Gambar KOP (JPG/PNG)
-                  </button>
-                  {localProfile.kopImageUrl && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setLocalProfile({ ...localProfile, kopImageUrl: undefined, useOriginalKopImage: false })
-                      }
-                      className="px-3 py-1.5 font-semibold bg-red-50 text-red-700 border border-red-200 rounded-lg cursor-pointer"
-                    >
-                      Hapus Gambar KOP
-                    </button>
-                  )}
-                </>
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-lg cursor-pointer whitespace-nowrap"
+                >
+                  <Save className="w-3.5 h-3.5" /> Simpan KOP &amp; Identitas
+                </button>
               )}
             </div>
 
-            {localProfile.useOriginalKopImage && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Lebar Gambar KOP (%)</label>
-                  <input
-                    type="number"
-                    min={40}
-                    max={100}
-                    disabled={!canEdit}
-                    value={localProfile.kopWidthPercent ?? 100}
-                    onChange={(e) =>
-                      setLocalProfile({ ...localProfile, kopWidthPercent: Number(e.target.value) })
-                    }
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg tabular-nums"
-                  />
+            {/* Mode KOP Switch */}
+            <div className="flex flex-wrap items-center gap-4 p-3 rounded-lg bg-slate-50 border border-slate-200">
+              <label className="inline-flex items-center gap-2 font-bold text-slate-800 cursor-pointer">
+                <input
+                  type="radio"
+                  name="kopMode"
+                  disabled={!canEdit}
+                  checked={!localProfile.useOriginalKopImage}
+                  onChange={() => setLocalProfile({ ...localProfile, useOriginalKopImage: false })}
+                />
+                KOP Standar SAUM (Logo Kemenag + Isian Teks KOP + Logo Madrasah)
+              </label>
+
+              <label className="inline-flex items-center gap-2 font-bold text-slate-800 cursor-pointer">
+                <input
+                  type="radio"
+                  name="kopMode"
+                  disabled={!canEdit}
+                  checked={Boolean(localProfile.useOriginalKopImage)}
+                  onChange={() => setLocalProfile({ ...localProfile, useOriginalKopImage: true })}
+                />
+                Gunakan Gambar KOP Utuh (JPG/PNG Scan Resmi)
+              </label>
+            </div>
+
+            {/* Panel KOP Standar: Logo Kemenag, Logo Madrasah & Isian Baris KOP */}
+            {!localProfile.useOriginalKopImage ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Logo Kemenag */}
+                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-900">Logo Kemenag (Kiri)</span>
+                      <label className="inline-flex items-center gap-1.5 font-semibold text-slate-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          disabled={!canEdit}
+                          checked={localProfile.showLogoKemenag ?? true}
+                          onChange={(e) =>
+                            setLocalProfile({ ...localProfile, showLogoKemenag: e.target.checked })
+                          }
+                        />
+                        Tampilkan
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-14 h-14 rounded-lg border border-slate-200 bg-white flex items-center justify-center overflow-hidden shrink-0">
+                        {localProfile.logoKemenagUrl ? (
+                          <img
+                            src={localProfile.logoKemenagUrl}
+                            alt="Logo Kemenag"
+                            className="w-12 h-12 object-contain"
+                          />
+                        ) : (
+                          <span className="text-[10px] font-semibold text-emerald-800 text-center px-1">
+                            Default Kemenag
+                          </span>
+                        )}
+                      </div>
+                      {canEdit && (
+                        <div className="flex flex-col gap-1.5">
+                          <input
+                            ref={logoKemenagRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleUploadImage(e, 'logoKemenagUrl')}
+                            className="hidden"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => logoKemenagRef.current?.click()}
+                            className="px-3 py-1.5 font-semibold bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 rounded-lg cursor-pointer"
+                          >
+                            Upload Logo Kemenag
+                          </button>
+                          {localProfile.logoKemenagUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setLocalProfile({ ...localProfile, logoKemenagUrl: undefined })}
+                              className="px-3 py-1 font-semibold bg-red-50 text-red-700 border border-red-200 rounded-lg cursor-pointer"
+                            >
+                              Hapus / Pakai Default
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Logo Madrasah */}
+                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-900">Logo Madrasah (Kanan)</span>
+                      <label className="inline-flex items-center gap-1.5 font-semibold text-slate-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          disabled={!canEdit}
+                          checked={localProfile.showLogoMadrasah ?? true}
+                          onChange={(e) =>
+                            setLocalProfile({ ...localProfile, showLogoMadrasah: e.target.checked })
+                          }
+                        />
+                        Tampilkan
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-14 h-14 rounded-lg border border-slate-200 bg-white flex items-center justify-center overflow-hidden shrink-0">
+                        {localProfile.logoMadrasahUrl ? (
+                          <img
+                            src={localProfile.logoMadrasahUrl}
+                            alt="Logo Madrasah"
+                            className="w-12 h-12 object-contain"
+                          />
+                        ) : (
+                          <span className="text-[10px] font-semibold text-emerald-800 text-center px-1">
+                            Badge {localProfile.jenjang || 'MA'}
+                          </span>
+                        )}
+                      </div>
+                      {canEdit && (
+                        <div className="flex flex-col gap-1.5">
+                          <input
+                            ref={logoMadrasahRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleUploadImage(e, 'logoMadrasahUrl')}
+                            className="hidden"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => logoMadrasahRef.current?.click()}
+                            className="px-3 py-1.5 font-semibold bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 rounded-lg cursor-pointer"
+                          >
+                            Upload Logo Madrasah
+                          </button>
+                          {localProfile.logoMadrasahUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setLocalProfile({ ...localProfile, logoMadrasahUrl: undefined })}
+                              className="px-3 py-1 font-semibold bg-red-50 text-red-700 border border-red-200 rounded-lg cursor-pointer"
+                            >
+                              Hapus / Pakai Default
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Ukuran Logo */}
+                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 space-y-2">
+                    <label className="block font-bold text-slate-900">
+                      Ukuran Logo KOP ({localProfile.kopLogoSizePx ?? 64} px)
+                    </label>
+                    <input
+                      type="range"
+                      min={36}
+                      max={96}
+                      step={2}
+                      disabled={!canEdit}
+                      value={localProfile.kopLogoSizePx ?? 64}
+                      onChange={(e) =>
+                        setLocalProfile({ ...localProfile, kopLogoSizePx: Number(e.target.value) })
+                      }
+                      className="w-full accent-emerald-700"
+                    />
+                    <div className="flex items-center justify-between text-[11px] text-slate-500">
+                      <span>Kecil (36px)</span>
+                      <span>Standar (64px)</span>
+                      <span>Besar (96px)</span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Posisi</label>
-                  <select
-                    disabled={!canEdit}
-                    value={localProfile.kopPosition || 'center'}
-                    onChange={(e) =>
-                      setLocalProfile({
-                        ...localProfile,
-                        kopPosition: e.target.value as MadrasahProfile['kopPosition'],
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
-                  >
-                    <option value="left">Rata Kiri</option>
-                    <option value="center">Tengah</option>
-                    <option value="right">Rata Kanan</option>
-                  </select>
+
+                {/* Editable KOP Text Lines */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Isian KOP Baris 1 (Instansi Atas)
+                    </label>
+                    <input
+                      disabled={!canEdit}
+                      value={
+                        localProfile.kopBaris1 !== undefined
+                          ? localProfile.kopBaris1
+                          : 'KEMENTERIAN AGAMA REPUBLIK INDONESIA'
+                      }
+                      onChange={(e) => setLocalProfile({ ...localProfile, kopBaris1: e.target.value })}
+                      placeholder="KEMENTERIAN AGAMA REPUBLIK INDONESIA"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Isian KOP Baris 2 (Kankemenag / Yayasan)
+                    </label>
+                    <input
+                      disabled={!canEdit}
+                      value={localProfile.kopBaris2 ?? ''}
+                      onChange={(e) => setLocalProfile({ ...localProfile, kopBaris2: e.target.value })}
+                      placeholder={
+                        localProfile.kabupatenKota
+                          ? `KANTOR KEMENTERIAN AGAMA ${localProfile.kabupatenKota.toUpperCase()}`
+                          : 'KANTOR KEMENTERIAN AGAMA KABUPATEN ...'
+                      }
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Isian KOP Baris 3 (Sub-Instansi / Opsional)
+                    </label>
+                    <input
+                      disabled={!canEdit}
+                      value={localProfile.kopBaris3 ?? ''}
+                      onChange={(e) => setLocalProfile({ ...localProfile, kopBaris3: e.target.value })}
+                      placeholder="Contoh: PANITIA PELAKSANA ASESMEN MADRASAH"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Jarak Atas (mm)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={25}
-                    disabled={!canEdit}
-                    value={localProfile.kopMarginTopMm ?? 0}
-                    onChange={(e) =>
-                      setLocalProfile({ ...localProfile, kopMarginTopMm: Number(e.target.value) })
-                    }
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg tabular-nums"
-                  />
+              </div>
+            ) : (
+              /* Original Uploaded KOP Image Panel */
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  {canEdit && (
+                    <>
+                      <input
+                        ref={kopFileRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={(e) => handleUploadImage(e, 'kopImageUrl')}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => kopFileRef.current?.click()}
+                        className="px-3.5 py-2 font-semibold bg-slate-800 text-white rounded-lg cursor-pointer"
+                      >
+                        Upload Gambar KOP (JPG/PNG)
+                      </button>
+                      {localProfile.kopImageUrl && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setLocalProfile({
+                              ...localProfile,
+                              kopImageUrl: undefined,
+                              useOriginalKopImage: false,
+                            })
+                          }
+                          className="px-3 py-2 font-semibold bg-red-50 text-red-700 border border-red-200 rounded-lg cursor-pointer"
+                        >
+                          Hapus Gambar KOP
+                        </button>
+                      )}
+                    </>
+                  )}
                 </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Jarak Bawah (mm)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={25}
-                    disabled={!canEdit}
-                    value={localProfile.kopMarginBottomMm ?? 4}
-                    onChange={(e) =>
-                      setLocalProfile({ ...localProfile, kopMarginBottomMm: Number(e.target.value) })
-                    }
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg tabular-nums"
-                  />
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-1">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Lebar Gambar KOP (%)</label>
+                    <input
+                      type="number"
+                      min={40}
+                      max={100}
+                      disabled={!canEdit}
+                      value={localProfile.kopWidthPercent ?? 100}
+                      onChange={(e) =>
+                        setLocalProfile({ ...localProfile, kopWidthPercent: Number(e.target.value) })
+                      }
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg tabular-nums"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Posisi</label>
+                    <select
+                      disabled={!canEdit}
+                      value={localProfile.kopPosition || 'center'}
+                      onChange={(e) =>
+                        setLocalProfile({
+                          ...localProfile,
+                          kopPosition: e.target.value as MadrasahProfile['kopPosition'],
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                    >
+                      <option value="left">Rata Kiri</option>
+                      <option value="center">Tengah</option>
+                      <option value="right">Rata Kanan</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Jarak Atas (mm)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={25}
+                      disabled={!canEdit}
+                      value={localProfile.kopMarginTopMm ?? 0}
+                      onChange={(e) =>
+                        setLocalProfile({ ...localProfile, kopMarginTopMm: Number(e.target.value) })
+                      }
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg tabular-nums"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Jarak Bawah (mm)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={25}
+                      disabled={!canEdit}
+                      value={localProfile.kopMarginBottomMm ?? 4}
+                      onChange={(e) =>
+                        setLocalProfile({ ...localProfile, kopMarginBottomMm: Number(e.target.value) })
+                      }
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg tabular-nums"
+                    />
+                  </div>
                 </div>
               </div>
             )}
 
             <div className="p-4 border border-dashed border-slate-300 rounded-lg bg-slate-50">
-              <p className="text-[11px] text-slate-500 mb-2 font-semibold">Pratinjau KOP Aktif pada Dokumen Cetak:</p>
-              <div className="bg-white p-3 border border-slate-200">
+              <p className="text-[11px] text-slate-500 mb-2 font-semibold">
+                Pratinjau KOP Aktif pada Seluruh Dokumen Cetak SAUM:
+              </p>
+              <div className="bg-white p-4 border border-slate-200">
                 <KopSurat profile={localProfile} />
               </div>
             </div>
           </div>
 
+          {/* Card 2: Identitas Madrasah & Kontak KOP */}
           <div className="bg-white p-5 rounded-xl border border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
             <div className="md:col-span-2">
-              <label className="block font-semibold text-slate-700 mb-1">Nama Madrasah</label>
+              <label className="block font-semibold text-slate-700 mb-1">Nama Madrasah (Tampil Tebal di KOP)</label>
               <input
                 disabled={!canEdit}
                 value={localProfile.namaMadrasah}
                 onChange={(e) => setLocalProfile({ ...localProfile, namaMadrasah: e.target.value })}
+                placeholder="Contoh: MADRASAH ALIYAH UNGGULAN ..."
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold"
               />
             </div>
@@ -365,25 +641,13 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
               />
             </div>
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Logo Madrasah (Kartu & KOP Standar)</label>
-              {canEdit && (
-                <>
-                  <input
-                    ref={logoMadrasahRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleUploadImage(e, 'logoMadrasahUrl')}
-                    className="hidden"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => logoMadrasahRef.current?.click()}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 font-semibold cursor-pointer"
-                  >
-                    Upload Logo Madrasah
-                  </button>
-                </>
-              )}
+              <label className="block font-semibold text-slate-700 mb-1">Kode Pos</label>
+              <input
+                disabled={!canEdit}
+                value={localProfile.kodePos}
+                onChange={(e) => setLocalProfile({ ...localProfile, kodePos: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono"
+              />
             </div>
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Desa / Kelurahan</label>
@@ -409,6 +673,36 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                 disabled={!canEdit}
                 value={localProfile.provinsi}
                 onChange={(e) => setLocalProfile({ ...localProfile, provinsi: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Telepon (KOP)</label>
+              <input
+                disabled={!canEdit}
+                value={localProfile.telepon}
+                onChange={(e) => setLocalProfile({ ...localProfile, telepon: e.target.value })}
+                placeholder="(022) 1234567"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Email (KOP)</label>
+              <input
+                disabled={!canEdit}
+                value={localProfile.email}
+                onChange={(e) => setLocalProfile({ ...localProfile, email: e.target.value })}
+                placeholder="info@madrasah.sch.id"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Website (KOP)</label>
+              <input
+                disabled={!canEdit}
+                value={localProfile.website}
+                onChange={(e) => setLocalProfile({ ...localProfile, website: e.target.value })}
+                placeholder="https://madrasah.sch.id"
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg"
               />
             </div>
@@ -473,7 +767,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                   type="submit"
                   className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-lg cursor-pointer"
                 >
-                  <Save className="w-4 h-4" /> Simpan Identitas & KOP
+                  <Save className="w-4 h-4" /> Simpan Identitas, Logo &amp; KOP
                 </button>
               </div>
             )}
@@ -484,10 +778,12 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
       {/* Tab 2: Paper Presets */}
       {activeTab === 'kertas' && (
         <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-bold text-slate-900">Pengaturan Kertas & Margin per Jenis Dokumen</h3>
-              <p className="text-xs text-slate-500">Standar ukuran A4 (210x297 mm) dan F4 (215x330 mm).</p>
+              <h3 className="text-sm font-bold text-slate-900">Pengaturan Kertas, Orientasi, Margin 4 Sisi &amp; Skala Cetak</h3>
+              <p className="text-xs text-slate-500">
+                Standar ukuran A4 (210×297 mm) dan F4 (215×330 mm). Margin Atas, Kanan, Bawah, dan Kiri dapat disesuaikan per dokumen agar penuh kertas tanpa terpotong.
+              </p>
             </div>
             {canEdit && (
               <button
@@ -504,82 +800,136 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
                   <th className="px-3 py-2.5">Jenis Dokumen</th>
-                  <th className="px-3 py-2.5">Ukuran Kertas</th>
-                  <th className="px-3 py-2.5">Orientasi</th>
-                  <th className="px-3 py-2.5">Margin (mm)</th>
-                  <th className="px-3 py-2.5 text-center">Tampilkan KOP</th>
+                  <th className="px-2.5 py-2.5">Ukuran Kertas</th>
+                  <th className="px-2.5 py-2.5">Orientasi</th>
+                  <th className="px-2 py-2.5 text-center">Atas</th>
+                  <th className="px-2 py-2.5 text-center">Kanan</th>
+                  <th className="px-2 py-2.5 text-center">Bawah</th>
+                  <th className="px-2 py-2.5 text-center">Kiri</th>
+                  <th className="px-2 py-2.5 text-center">Skala (%)</th>
+                  <th className="px-2.5 py-2.5 text-center">Kartu/Hal</th>
+                  <th className="px-2.5 py-2.5 text-center">KOP</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {localPresets.map((pr, idx) => (
-                  <tr key={pr.id}>
-                    <td className="px-3 py-2.5 font-bold text-slate-900">{pr.label}</td>
-                    <td className="px-3 py-2">
-                      <select
-                        disabled={!canEdit}
-                        value={pr.size}
-                        onChange={(e) => {
-                          const next = [...localPresets];
-                          next[idx] = { ...pr, size: e.target.value as PaperSize };
-                          setLocalPresets(next);
-                        }}
-                        className="px-2.5 py-1.5 border border-slate-300 rounded bg-white"
-                      >
-                        <option value="A4">A4 (210×297 mm)</option>
-                        <option value="F4">F4 (215×330 mm)</option>
-                      </select>
-                    </td>
-                    <td className="px-3 py-2">
-                      <select
-                        disabled={!canEdit}
-                        value={pr.orientation}
-                        onChange={(e) => {
-                          const next = [...localPresets];
-                          next[idx] = { ...pr, orientation: e.target.value as PaperOrientation };
-                          setLocalPresets(next);
-                        }}
-                        className="px-2.5 py-1.5 border border-slate-300 rounded bg-white"
-                      >
-                        <option value="portrait">Portrait</option>
-                        <option value="landscape">Landscape</option>
-                      </select>
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        min={5}
-                        max={25}
-                        disabled={!canEdit}
-                        value={pr.marginTopMm}
-                        onChange={(e) => {
-                          const m = Number(e.target.value) || 10;
-                          const next = [...localPresets];
-                          next[idx] = {
-                            ...pr,
-                            marginTopMm: m,
-                            marginBottomMm: m,
-                            marginLeftMm: m,
-                            marginRightMm: m,
-                          };
-                          setLocalPresets(next);
-                        }}
-                        className="w-20 px-2 py-1.5 border border-slate-300 rounded font-mono text-center"
-                      />
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      <input
-                        type="checkbox"
-                        disabled={!canEdit}
-                        checked={pr.showKop}
-                        onChange={(e) => {
-                          const next = [...localPresets];
-                          next[idx] = { ...pr, showKop: e.target.checked };
-                          setLocalPresets(next);
-                        }}
-                      />
-                    </td>
-                  </tr>
-                ))}
+                {localPresets.map((pr, idx) => {
+                  const isCardPreset = pr.id === 'kartu_peserta' || pr.id === 'nomor_meja';
+                  return (
+                    <tr key={pr.id}>
+                      <td className="px-3 py-2.5 font-bold text-slate-900">{pr.label}</td>
+                      <td className="px-2.5 py-2">
+                        <select
+                          disabled={!canEdit}
+                          value={pr.size}
+                          onChange={(e) => {
+                            const next = [...localPresets];
+                            next[idx] = { ...pr, size: e.target.value as PaperSize };
+                            setLocalPresets(next);
+                          }}
+                          className="px-2 py-1.5 border border-slate-300 rounded bg-white"
+                        >
+                          <option value="A4">A4 (210×297)</option>
+                          <option value="F4">F4 (215×330)</option>
+                        </select>
+                      </td>
+                      <td className="px-2.5 py-2">
+                        <select
+                          disabled={!canEdit}
+                          value={pr.orientation}
+                          onChange={(e) => {
+                            const next = [...localPresets];
+                            next[idx] = { ...pr, orientation: e.target.value as PaperOrientation };
+                            setLocalPresets(next);
+                          }}
+                          className="px-2 py-1.5 border border-slate-300 rounded bg-white"
+                        >
+                          <option value="portrait">Portrait</option>
+                          <option value="landscape">Landscape</option>
+                        </select>
+                      </td>
+                      {(
+                        [
+                          'marginTopMm',
+                          'marginRightMm',
+                          'marginBottomMm',
+                          'marginLeftMm',
+                        ] as const
+                      ).map((field) => (
+                        <td key={field} className="px-1.5 py-2 text-center">
+                          <input
+                            type="number"
+                            min={0}
+                            max={40}
+                            disabled={!canEdit}
+                            value={pr[field]}
+                            onChange={(e) => {
+                              const next = [...localPresets];
+                              next[idx] = {
+                                ...pr,
+                                [field]: Math.max(0, Math.min(40, Number(e.target.value || 0))),
+                              };
+                              setLocalPresets(next);
+                            }}
+                            className="w-14 px-1.5 py-1.5 border border-slate-300 rounded font-mono text-center tabular-nums"
+                          />
+                        </td>
+                      ))}
+                      <td className="px-1.5 py-2 text-center">
+                        <input
+                          type="number"
+                          min={60}
+                          max={120}
+                          step={5}
+                          disabled={!canEdit}
+                          value={pr.scalePercent ?? 100}
+                          onChange={(e) => {
+                            const next = [...localPresets];
+                            next[idx] = {
+                              ...pr,
+                              scalePercent: Math.max(60, Math.min(120, Number(e.target.value || 100))),
+                            };
+                            setLocalPresets(next);
+                          }}
+                          className="w-16 px-1.5 py-1.5 border border-slate-300 rounded font-mono text-center tabular-nums"
+                        />
+                      </td>
+                      <td className="px-2 py-2 text-center">
+                        {isCardPreset ? (
+                          <select
+                            disabled={!canEdit}
+                            value={pr.cardsPerPage || 6}
+                            onChange={(e) => {
+                              const next = [...localPresets];
+                              next[idx] = {
+                                ...pr,
+                                cardsPerPage: Number(e.target.value) === 4 ? 4 : 6,
+                              };
+                              setLocalPresets(next);
+                            }}
+                            className="px-2 py-1.5 border border-slate-300 rounded bg-white font-semibold"
+                          >
+                            <option value={6}>6 / F4</option>
+                            <option value={4}>4 / Hal</option>
+                          </select>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-2.5 py-2 text-center">
+                        <input
+                          type="checkbox"
+                          disabled={!canEdit}
+                          checked={pr.showKop}
+                          onChange={(e) => {
+                            const next = [...localPresets];
+                            next[idx] = { ...pr, showKop: e.target.checked };
+                            setLocalPresets(next);
+                          }}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -659,42 +1009,61 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {committee.map((c, idx) => (
-                  <tr key={c.id}>
-                    <td className="px-3 py-2.5 text-center tabular-nums">{idx + 1}</td>
-                    <td className="px-3 py-2.5">
-                      <div className="font-bold text-slate-900">{c.nama}</div>
-                      <div className="text-[11px] font-mono text-slate-500">{c.nip || '-'}</div>
+                {committee.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                      Belum ada anggota panitia ujian tercatat. Tambahkan susunan panitia melalui formulir di atas.
                     </td>
-                    <td className="px-3 py-2.5 font-semibold text-emerald-800">{c.jabatan}</td>
-                    <td className="px-3 py-2.5 text-slate-600">{c.tugas}</td>
-                    {canEdit && (
-                      <td className="px-3 py-2.5 text-right">
-                        <button
-                          onClick={() => handleDeleteCommittee(c.id)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    )}
                   </tr>
-                ))}
+                ) : (
+                  committee.map((c, idx) => (
+                    <tr key={c.id}>
+                      <td className="px-3 py-2.5 text-center tabular-nums">{idx + 1}</td>
+                      <td className="px-3 py-2.5">
+                        <div className="font-bold text-slate-900">{c.nama}</div>
+                        <div className="text-[11px] font-mono text-slate-500">{c.nip || '-'}</div>
+                      </td>
+                      <td className="px-3 py-2.5 font-semibold text-emerald-800">{c.jabatan}</td>
+                      <td className="px-3 py-2.5 text-slate-600">{c.tugas}</td>
+                      {canEdit && (
+                        <td className="px-3 py-2.5 text-right">
+                          <button
+                            onClick={() => handleDeleteCommittee(c.id)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      {/* Tab 4: Users, Role Switcher & Audit Logs */}
+      {/* Tab 4: Users, Role Switcher, Reset & Audit Logs */}
       {activeTab === 'akses' && (
         <div className="space-y-6">
           <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">Akun Pengguna & Pengujian Hak Akses (RBAC Backend)</h3>
-              <p className="text-xs text-slate-500">
-                Klik "Masuk sebagai Akun" untuk menguji pembatasan menu dan otorisasi API di server secara nyata.
-              </p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Akun Pengguna &amp; Pengujian Hak Akses (RBAC Backend)</h3>
+                <p className="text-xs text-slate-500">
+                  Kelola nama/jabatan pejabat akun dan uji pembatasan menu serta otorisasi API di server secara nyata.
+                </p>
+              </div>
+              {canManageUsers && (
+                <button
+                  type="button"
+                  onClick={handleSaveUsers}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-lg cursor-pointer"
+                >
+                  <Save className="w-3.5 h-3.5" /> Simpan Profil Akun
+                </button>
+              )}
             </div>
 
             <div className="overflow-x-auto">
@@ -709,19 +1078,47 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {users.map((u) => {
+                  {localUsers.map((u, idx) => {
                     const isCurrent = u.id === currentUser.id;
                     return (
                       <tr key={u.id} className={isCurrent ? 'bg-emerald-50/50' : ''}>
                         <td className="px-3 py-2.5 font-mono font-bold">{u.username}</td>
-                        <td className="px-3 py-2.5 font-semibold text-slate-900">{u.nama}</td>
-                        <td className="px-3 py-2.5 text-slate-600">{u.jabatan}</td>
+                        <td className="px-3 py-2 font-semibold text-slate-900">
+                          {canManageUsers ? (
+                            <input
+                              value={u.nama}
+                              onChange={(e) => {
+                                const next = [...localUsers];
+                                next[idx] = { ...u, nama: e.target.value };
+                                setLocalUsers(next);
+                              }}
+                              className="w-full min-w-[180px] px-2.5 py-1.5 border border-slate-300 rounded bg-white font-semibold"
+                            />
+                          ) : (
+                            u.nama
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-slate-600">
+                          {canManageUsers ? (
+                            <input
+                              value={u.jabatan}
+                              onChange={(e) => {
+                                const next = [...localUsers];
+                                next[idx] = { ...u, jabatan: e.target.value };
+                                setLocalUsers(next);
+                              }}
+                              className="w-full min-w-[160px] px-2.5 py-1.5 border border-slate-300 rounded bg-white"
+                            />
+                          ) : (
+                            u.jabatan
+                          )}
+                        </td>
                         <td className="px-3 py-2.5">
                           <select
                             disabled={!canManageUsers}
                             value={u.role}
                             onChange={(e) => handleUpdateUserRole(u.id, e.target.value as UserRole)}
-                            className="px-2.5 py-1 border border-slate-300 rounded bg-white font-semibold"
+                            className="px-2.5 py-1.5 border border-slate-300 rounded bg-white font-semibold"
                           >
                             <option value="Super Admin">Super Admin</option>
                             <option value="Admin Ujian">Admin Ujian</option>
@@ -736,7 +1133,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                           ) : (
                             <button
                               onClick={() => onSwitchUser(u.username)}
-                              className="px-3 py-1.5 text-xs font-semibold bg-slate-800 text-white rounded-lg hover:bg-slate-900 cursor-pointer"
+                              className="px-3 py-1.5 text-xs font-semibold bg-slate-800 text-white rounded-lg hover:bg-slate-900 cursor-pointer whitespace-nowrap"
                             >
                               Masuk sebagai {u.role}
                             </button>
@@ -749,6 +1146,48 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
               </table>
             </div>
           </div>
+
+          {canManageUsers && onResetClean && (
+            <div className="bg-white p-5 rounded-xl border border-red-200 flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h3 className="text-sm font-bold text-red-900 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-red-600" />
+                  Reset Data Ujian Bersih (Mulai Ujian Baru)
+                </h3>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Menghapus seluruh peserta, ruang, jadwal, pengawas, segel, catatan HP, dan arsip sementara sambil mempertahankan pengaturan Super Admin.
+                </p>
+              </div>
+              {!confirmResetOpen ? (
+                <button
+                  type="button"
+                  onClick={() => setConfirmResetOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-red-700 bg-red-50 border border-red-300 hover:bg-red-100 rounded-lg cursor-pointer whitespace-nowrap"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" /> Reset Data Bersih
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={isResetting}
+                    onClick={() => setConfirmResetOpen(false)}
+                    className="px-3 py-2 text-xs font-semibold bg-slate-100 text-slate-700 rounded-lg cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isResetting}
+                    onClick={handleConfirmResetClean}
+                    className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg cursor-pointer disabled:opacity-50"
+                  >
+                    {isResetting ? 'Membersihkan...' : 'Ya, Bersihkan Semua Data'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-3">
             <h3 className="text-sm font-bold text-slate-900">Audit Log Perubahan Data Sistem</h3>
@@ -764,17 +1203,25 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {auditLogs.map((log) => (
-                    <tr key={log.id}>
-                      <td className="px-3 py-2 font-mono text-slate-500">
-                        {new Date(log.timestamp).toLocaleString('id-ID')}
+                  {auditLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-6 text-center text-slate-400">
+                        Belum ada aktivitas perubahan data yang tercatat.
                       </td>
-                      <td className="px-3 py-2 font-semibold">{log.actor}</td>
-                      <td className="px-3 py-2 font-mono text-slate-600">{log.role}</td>
-                      <td className="px-3 py-2 font-mono font-bold text-emerald-800">{log.action}</td>
-                      <td className="px-3 py-2 text-slate-700">{log.detail}</td>
                     </tr>
-                  ))}
+                  ) : (
+                    auditLogs.map((log) => (
+                      <tr key={log.id}>
+                        <td className="px-3 py-2 font-mono text-slate-500">
+                          {new Date(log.timestamp).toLocaleString('id-ID')}
+                        </td>
+                        <td className="px-3 py-2 font-semibold">{log.actor}</td>
+                        <td className="px-3 py-2 font-mono text-slate-600">{log.role}</td>
+                        <td className="px-3 py-2 font-mono font-bold text-emerald-800">{log.action}</td>
+                        <td className="px-3 py-2 text-slate-700">{log.detail}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

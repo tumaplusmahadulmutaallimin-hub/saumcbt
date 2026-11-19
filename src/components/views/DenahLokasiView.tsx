@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   X,
   Compass,
+  Plus,
 } from 'lucide-react';
 import {
   ExamConfig,
@@ -21,6 +22,7 @@ import {
 import { computeClassRangesInRoom } from '../../utils/seating';
 import { DenahLokasiCetak } from '../documents/DenahLokasiCetak';
 import { PrintToolbar } from '../documents/PrintToolbar';
+import { usePrintLayout } from '../../utils/printLayout';
 
 interface DenahLokasiViewProps {
   profile: MadrasahProfile;
@@ -32,6 +34,7 @@ interface DenahLokasiViewProps {
   paperPreset?: PaperPreset;
   canEdit: boolean;
   onSaveDenahLokasi: (next: PhysicalClassroom[], finalized?: boolean) => Promise<void>;
+  onSavePreset?: (next: PaperPreset) => Promise<void>;
 }
 
 export const DenahLokasiView: React.FC<DenahLokasiViewProps> = ({
@@ -44,22 +47,52 @@ export const DenahLokasiView: React.FC<DenahLokasiViewProps> = ({
   paperPreset,
   canEdit,
   onSaveDenahLokasi,
+  onSavePreset,
 }) => {
   const [selectedClassroom, setSelectedClassroom] = useState<PhysicalClassroom | null>(null);
+  const [draftNamaKelas, setDraftNamaKelas] = useState<string>('');
   const [draftRoomIds, setDraftRoomIds] = useState<string[]>([]);
   const [draftSessionMap, setDraftSessionMap] = useState<Record<number, string>>({});
   const [confirmEditAfterFinal, setConfirmEditAfterFinal] = useState(false);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [notice, setNotice] = useState('');
 
+  const { layout, setLayout } = usePrintLayout(paperPreset, {
+    size: 'A4',
+    orientation: 'landscape',
+    marginMm: 8,
+  });
+
   const roomMap = new Map(rooms.map((r) => [r.id, r]));
   const supervisorMap = new Map(supervisors.map((s) => [s.id, s]));
 
   const openModal = (pc: PhysicalClassroom) => {
     setSelectedClassroom(pc);
+    setDraftNamaKelas(pc.namaKelas);
     setDraftRoomIds([...pc.assignedRoomIds]);
     setDraftSessionMap({ ...(pc.sessionRoomMap || {}) });
     setConfirmEditAfterFinal(false);
+  };
+
+  const handleCreateDefaultGrid = async () => {
+    const classNames = examConfig.registeredClasses || [];
+    const coords: Array<{ row: 0 | 1; col: 0 | 1 | 2 }> = [
+      { row: 0, col: 0 },
+      { row: 0, col: 1 },
+      { row: 0, col: 2 },
+      { row: 1, col: 0 },
+      { row: 1, col: 1 },
+      { row: 1, col: 2 },
+    ];
+    const generated: PhysicalClassroom[] = coords.map((c, idx) => ({
+      id: `cls-${Date.now()}-${idx}`,
+      namaKelas: classNames[idx] ? `Kelas ${classNames[idx]}` : `Ruang Kelas ${idx + 1}`,
+      row: c.row,
+      col: c.col,
+      assignedRoomIds: rooms[idx] ? [rooms[idx].id] : [],
+    }));
+    await onSaveDenahLokasi(generated, false);
+    setNotice('Tata letak 6 ruang kelas (2×3) berhasil dibuat. Klik kotak kelas untuk menyesuaikan ruang ujian.');
   };
 
   const toggleDraftRoom = (roomId: string) => {
@@ -79,6 +112,7 @@ export const DenahLokasiView: React.FC<DenahLokasiViewProps> = ({
       pc.id === selectedClassroom.id
         ? {
             ...pc,
+            namaKelas: draftNamaKelas.trim() || pc.namaKelas,
             assignedRoomIds: draftRoomIds,
             sessionRoomMap: examConfig.moda === 'online' ? draftSessionMap : undefined,
           }
@@ -86,7 +120,7 @@ export const DenahLokasiView: React.FC<DenahLokasiViewProps> = ({
     );
     await onSaveDenahLokasi(next, examConfig.isDenahLokasiFinalized);
     setSelectedClassroom(null);
-    setNotice(`Penetapan ruang untuk ${selectedClassroom.namaKelas} berhasil disimpan.`);
+    setNotice(`Penetapan ruang untuk ${draftNamaKelas.trim() || selectedClassroom.namaKelas} berhasil disimpan.`);
   };
 
   const handleToggleFinalize = async () => {
@@ -107,18 +141,21 @@ export const DenahLokasiView: React.FC<DenahLokasiViewProps> = ({
         <PrintToolbar
           title="Pratinjau Cetak Denah Lokasi Ruang Ujian"
           onBack={() => setShowPrintPreview(false)}
-          paperSize={paperPreset?.size || 'A4'}
-          orientation="landscape"
+          layout={layout}
+          onLayoutChange={setLayout}
+          onSaveLayout={onSavePreset}
         />
-        <DenahLokasiCetak
-          profile={profile}
-          examConfig={examConfig}
-          physicalClassrooms={physicalClassrooms}
-          rooms={rooms}
-          students={students}
-          supervisors={supervisors}
-          paperPreset={paperPreset}
-        />
+        <div className="overflow-x-auto pb-8 print:overflow-visible print:pb-0">
+          <DenahLokasiCetak
+            profile={profile}
+            examConfig={examConfig}
+            physicalClassrooms={physicalClassrooms}
+            rooms={rooms}
+            students={students}
+            supervisors={supervisors}
+            paperPreset={layout}
+          />
+        </div>
       </div>
     );
   }
@@ -182,6 +219,24 @@ export const DenahLokasiView: React.FC<DenahLokasiViewProps> = ({
       )}
 
       {/* Interactive Physical Map Matching Section F.2 */}
+      {physicalClassrooms.length === 0 ? (
+        <div className="bg-white p-8 rounded-xl border border-dashed border-slate-300 text-center space-y-3">
+          <MapPin className="w-8 h-8 text-emerald-700 mx-auto" />
+          <h3 className="text-sm font-bold text-slate-900">Belum Ada Tata Letak Ruang Kelas Fisik</h3>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            Buat tata letak denah lokasi 6 ruang kelas (2 baris × 3 kolom) lalu klik masing-masing kelas untuk menetapkan ruang ujian.
+          </p>
+          {canEdit && (
+            <button
+              type="button"
+              onClick={handleCreateDefaultGrid}
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-lg cursor-pointer"
+            >
+              <Plus className="w-4 h-4" /> Buat Tata Letak 6 Ruang Kelas (2×3)
+            </button>
+          )}
+        </div>
+      ) : (
       <div className="bg-white p-5 rounded-xl border border-slate-200 overflow-x-auto">
         <div className="min-w-[680px] space-y-3">
           {/* Compass + Top Right RUANG GURU */}
@@ -305,6 +360,7 @@ export const DenahLokasiView: React.FC<DenahLokasiViewProps> = ({
           </div>
         </div>
       </div>
+      )}
 
       {/* Modal PENETAPAN RUANG UJIAN */}
       {selectedClassroom && (
@@ -332,6 +388,15 @@ export const DenahLokasiView: React.FC<DenahLokasiViewProps> = ({
                 </span>
               </div>
             )}
+
+            <div className="text-xs">
+              <label className="block font-semibold text-slate-700 mb-1">Nama Ruang Kelas Fisik</label>
+              <input
+                value={draftNamaKelas}
+                onChange={(e) => setDraftNamaKelas(e.target.value)}
+                className="w-full px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900"
+              />
+            </div>
 
             <div className="space-y-2 text-xs">
               <p className="font-semibold text-slate-700">

@@ -12,6 +12,18 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Paper Preview Helpers */
+.saum-sheet {
+  background: #ffffff;
+  color: #0f172a;
+  box-sizing: border-box;
+  width: var(--saum-sheet-w, 210mm);
+  min-height: var(--saum-sheet-h, 297mm);
+  padding: var(--saum-pt, 10mm) var(--saum-pr, 10mm) var(--saum-pb, 10mm) var(--saum-pl, 10mm);
+  margin-left: auto;
+  margin-right: auto;
+}
+
 /* Custom Print Rules for Indonesian Official Documents */
 @media print {
   @page {
@@ -19,10 +31,17 @@
     margin: 8mm 10mm;
   }
 
+  html,
   body {
+    width: auto !important;
+    min-width: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
     background: white !important;
     color: black !important;
     font-size: 10.5pt;
+    overflow: visible !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
@@ -33,6 +52,24 @@
 
   .print-only {
     display: block !important;
+  }
+
+  .overflow-x-auto,
+  .overflow-y-auto,
+  .overflow-hidden {
+    overflow: visible !important;
+  }
+
+  .saum-sheet {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    zoom: var(--saum-scale, 1);
   }
 
   .print-page-break {
@@ -60,13 +97,6 @@
   .print-only {
     display: none;
   }
-}
-
-/* Paper Preview Helpers */
-.saum-sheet {
-  background: #ffffff;
-  color: #0f172a;
-  box-sizing: border-box;
 }
 
 /* Custom Scrollbar */
