@@ -115,7 +115,7 @@ export const DenahRuangView: React.FC<DenahRuangViewProps> = ({
           <div>
             <h2 className="text-base font-bold text-slate-900">Denah Tempat Duduk Peserta (6 Kursi/Baris • Portrait)</h2>
             <p className="text-xs text-slate-500">
-              Format cetak 1 ruang per halaman: 6 meja per baris dengan 2 celah lorong bersih, maksimal 22 kursi tanpa kotak kosong.
+              Format cetak 1 ruang per halaman: 6 kursi per baris (hingga 12 meja / 24 kursi) dengan 2 celah lorong bersih dan penandaan meja duduk sendiri agar tetap silang jenjang.
             </p>
           </div>
           <button

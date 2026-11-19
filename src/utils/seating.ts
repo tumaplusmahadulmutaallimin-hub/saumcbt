@@ -73,11 +73,26 @@ export function distributeSessions(
   });
 }
 
+export interface DeskPairSlot {
+  left: Student;
+  right?: Student;
+}
+
 /**
- * Interleave students from different jenjangs in 11:11 cross-jenjang pairs for a pool
- * so adjacent desks come from different grades wherever possible.
+ * Builds physical desks (1 meja = 2 kursi) for a room's student pool.
+ * Strictly pairs students from DIFFERENT jenjangs on every 2-seat desk.
+ * If one jenjang outnumbers the others inside the room, each leftover student
+ * is placed ALONE on a separate desk (right chair empty) rather than pairing
+ * two students of the same jenjang on one desk.
  */
-function buildCrossJenjangQueue(pool: Student[], rng: () => number = Math.random): Student[] {
+export function buildCrossJenjangDeskLayout(
+  pool: Student[],
+  rng: () => number = Math.random
+): {
+  desks: DeskPairSlot[];
+  seatAssignments: Array<{ student: Student; nomorMeja: number }>;
+  orderedStudents: Student[];
+} {
   const byJenjang = new Map<string, Student[]>();
   for (const s of pool) {
     const jen = s.jenjang || extractJenjang(s.kelas);
@@ -85,14 +100,14 @@ function buildCrossJenjangQueue(pool: Student[], rng: () => number = Math.random
     byJenjang.get(jen)!.push(s);
   }
 
-  // Shuffle within each jenjang
   const keys = Array.from(byJenjang.keys()).sort((a, b) => compareClasses(a, b));
   for (const k of keys) {
     byJenjang.set(k, shuffleArray(byJenjang.get(k)!, rng));
   }
 
-  // Pair largest jenjang groups 1:1 round-robin so every pair of seats mixes grades
-  const result: Student[] = [];
+  const desks: DeskPairSlot[] = [];
+
+  // 1. Pair 1:1 from the two largest remaining distinct jenjangs
   while (true) {
     const nonEmptyKeys = keys
       .filter((k) => (byJenjang.get(k)?.length || 0) > 0)
@@ -101,21 +116,42 @@ function buildCrossJenjangQueue(pool: Student[], rng: () => number = Math.random
     if (nonEmptyKeys.length === 0) break;
 
     if (nonEmptyKeys.length === 1) {
-      result.push(...(byJenjang.get(nonEmptyKeys[0]) || []));
+      // Only 1 jenjang remains in this room -> give each leftover student a solo desk
+      const leftovers = byJenjang.get(nonEmptyKeys[0]) || [];
+      for (const st of leftovers) {
+        desks.push({ left: st });
+      }
       byJenjang.set(nonEmptyKeys[0], []);
       break;
     }
 
-    // Take 1 from top two distinct jenjangs
     const k1 = nonEmptyKeys[0];
     const k2 = nonEmptyKeys[1];
-    const s1 = byJenjang.get(k1)!.shift();
-    const s2 = byJenjang.get(k2)!.shift();
-    if (s1) result.push(s1);
-    if (s2) result.push(s2);
+    const s1 = byJenjang.get(k1)!.shift()!;
+    const s2 = byJenjang.get(k2)!.shift()!;
+    desks.push({ left: s1, right: s2 });
   }
 
-  return result;
+  const seatAssignments: Array<{ student: Student; nomorMeja: number }> = [];
+  const orderedStudents: Student[] = [];
+  desks.forEach((desk, deskIdx) => {
+    const leftSeat = deskIdx * 2 + 1;
+    seatAssignments.push({ student: desk.left, nomorMeja: leftSeat });
+    orderedStudents.push(desk.left);
+    if (desk.right) {
+      seatAssignments.push({ student: desk.right, nomorMeja: leftSeat + 1 });
+      orderedStudents.push(desk.right);
+    }
+  });
+
+  return { desks, seatAssignments, orderedStudents };
+}
+
+/**
+ * Legacy helper kept for linear queues
+ */
+function buildCrossJenjangQueue(pool: Student[], rng: () => number = Math.random): Student[] {
+  return buildCrossJenjangDeskLayout(pool, rng).orderedStudents;
 }
 
 /**
@@ -171,6 +207,8 @@ function computeBalancedTargetSizes(totalStudents: number, roomCapacities: numbe
 /**
  * Allocate room buckets prioritizing 2-jenjang-only composition for lower rooms,
  * placing 3-jenjang mixed rooms only when needed and sorting them to the end.
+ * Also balances minority jenjang counts across rooms when needed so every room
+ * contains 2 distinct jenjangs and minimizes extra solo desks (allowing up to 12 desks cleanly).
  */
 function allocateCrossJenjangBuckets(
   pool: Student[],
@@ -189,7 +227,6 @@ function allocateCrossJenjangBuckets(
     byJenjang.set(k, shuffleArray(byJenjang.get(k)!, rng));
   }
 
-  // Sort larger target slots first during packing so big 2-jenjang rooms form cleanly
   const slotOrder = targetSizes
     .map((size, idx) => ({ size, idx }))
     .sort((a, b) => b.size - a.size || a.idx - b.idx);
@@ -202,8 +239,14 @@ function allocateCrossJenjangBuckets(
     return m;
   };
 
-  for (const { size } of slotOrder) {
+  for (let slotPos = 0; slotPos < slotOrder.length; slotPos++) {
+    const { size, idx: targetIdx } = slotOrder[slotPos];
     if (size <= 0) continue;
+
+    const remainingRoomsAfter = slotOrder
+      .slice(slotPos + 1)
+      .filter((s) => s.size > 0).length;
+
     const avail = getAvailMap();
     const remTotal = Array.from(avail.values()).reduce((sum, v) => sum + v, 0);
     const nextTotal = Math.max(0, remTotal - size);
@@ -214,9 +257,10 @@ function allocateCrossJenjangBuckets(
 
     let chosenTake: Map<string, number> | null = null;
 
-    // 1. Try pure 2-jenjang split (preferred for lower rooms)
+    // 1. Try 2-jenjang split (preferred for lower rooms)
+    // First prefer zero-solo-desk balanced split (<= ceil(size/2)), then allow slight solo imbalance
+    // (e.g. 12:10 -> 12 desks) if that avoids leaving another room with single jenjang or >12 desks.
     if (activeKeys.length >= 2) {
-      const halfFloor = Math.floor(size / 2);
       const halfCeil = Math.ceil(size / 2);
       let bestScore = Number.POSITIVE_INFINITY;
 
@@ -228,31 +272,58 @@ function allocateCrossJenjangBuckets(
           const cB = avail.get(kB) || 0;
           if (cA + cB < size) continue;
 
-          // Zero same-jenjang desk conflict inside a 2-jenjang room requires both >= floor(size/2)
-          const minA = Math.max(halfFloor, size - cB);
-          const maxA = Math.min(halfCeil, cA);
+          // If size >= 2, require at least 1 from both jenjangs in this 2-jenjang room
+          const minA = Math.max(size >= 2 ? 1 : 0, size - cB);
+          const maxA = Math.min(size >= 2 ? size - 1 : size, cA);
           if (minA > maxA) continue;
 
           for (let takeA = minA; takeA <= maxA; takeA++) {
             const takeB = size - takeA;
-            if (takeB > halfCeil || takeB > cB) continue;
+            if (takeB > cB) continue;
 
+            // Count remaining students after taking (kA: takeA, kB: takeB)
             let maxRemAfter = 0;
+            let activeAfterCount = 0;
+            let nonMaxRemTotal = 0;
             for (const k of jenjangKeys) {
               const left = (avail.get(k) || 0) - (k === kA ? takeA : k === kB ? takeB : 0);
+              if (left > 0) activeAfterCount++;
               if (left > maxRemAfter) maxRemAfter = left;
+              nonMaxRemTotal += left;
             }
-            const invariantExcess = Math.max(0, maxRemAfter - maxSafeAfter);
-            const activeAfterCount = jenjangKeys.filter((k) => {
-              const left = (avail.get(k) || 0) - (k === kA ? takeA : k === kB ? takeB : 0);
-              return left > 0;
-            }).length;
+            nonMaxRemTotal -= maxRemAfter;
 
-            // Lower score is better: satisfy invariant, keep >=2 jenjangs alive if nextTotal>0, use abundant grades
+            // How many desks does this room need, and minimum possible in remaining rooms?
+            const desksThisRoom = Math.max(takeA, takeB);
+            const soloExcessThisRoom = Math.max(0, desksThisRoom - halfCeil);
+            const invariantExcess = Math.max(0, maxRemAfter - maxSafeAfter);
+
+            // Check whether remaining non-majority students are enough to give every future room at least 1 partner
+            const starvedFutureRooms =
+              remainingRoomsAfter > 0
+                ? Math.max(0, remainingRoomsAfter - nonMaxRemTotal)
+                : 0;
+
+            // If a 3rd jenjang exists and using only 2 here forces single-jenjang or excessive desks later,
+            // heavily penalize ONLY when other jenjangs can still balance cleanly.
+            const needsMultiJenjangInstead =
+              activeKeys.length >= 3 && invariantExcess > 0 ? 1 : 0;
+
+            // Balanced split within <=12 desks preferred over greedy 11:11 that starves remaining rooms to 13+ desks
+            const estMaxDesksAfter =
+              remainingRoomsAfter > 0
+                ? Math.ceil(maxRemAfter / remainingRoomsAfter)
+                : 0;
+            const peakDesks = Math.max(desksThisRoom, estMaxDesksAfter);
+
             const score =
-              invariantExcess * 10000 +
-              (nextTotal > 0 && activeAfterCount < 2 ? 5000 : 0) +
-              maxRemAfter * 10 -
+              starvedFutureRooms * 100000 +
+              (nextTotal > 1 && activeAfterCount < 2 ? 80000 : 0) +
+              needsMultiJenjangInstead * 20000 +
+              peakDesks * 5000 +
+              invariantExcess * 500 +
+              soloExcessThisRoom * 80 +
+              Math.abs(takeA - takeB) * 5 -
               (cA + cB);
 
             if (score < bestScore) {
@@ -265,15 +336,57 @@ function allocateCrossJenjangBuckets(
           }
         }
       }
+
+      // If chosen 2-jenjang option STILL has invariantExcess > 0 AND >= 3 jenjangs exist,
+      // let step 2 build a balanced 3-jenjang room instead (so 3-jenjang room handles surplus cleanly).
+      if (chosenTake && activeKeys.length >= 3) {
+        let maxRem = 0;
+        let maxTaken = 0;
+        for (const k of jenjangKeys) {
+          const t = chosenTake.get(k) || 0;
+          if (t > maxTaken) maxTaken = t;
+          const left = (avail.get(k) || 0) - t;
+          if (left > maxRem) maxRem = left;
+        }
+        if (maxRem > maxSafeAfter || maxTaken > halfCeil) {
+          chosenTake = null;
+        }
+      }
     }
 
-    // 2. Fallback: Mix >= 3 jenjangs (or 1 jenjang if only 1 left) while capping each <= ceil(size/2) where possible
+    // 2. Fallback: Mix >= 3 jenjangs (or proportional 2-jenjang) while keeping every room multi-jenjang
     if (!chosenTake) {
       const take = new Map<string, number>();
       let remainingNeed = size;
       const capPerGrade = Math.ceil(size / 2);
 
-      // Fill while strictly respecting capPerGrade to guarantee cross-jenjang desks
+      // Helper to check if picking 1 from `k` would starve another future room from having >=2 jenjangs
+      const wouldStarveOtherJenjang = (k: string): boolean => {
+        if (remainingRoomsAfter === 0) return false;
+        let otherLeftTotal = 0;
+        for (const other of jenjangKeys) {
+          if (other !== k) {
+            otherLeftTotal += (avail.get(other) || 0) - (take.get(other) || 0);
+          }
+        }
+        // Only forbid exhausting `k` completely if doing so leaves < remainingRoomsAfter across non-dominant grades
+        const leftKAfter = (avail.get(k) || 0) - (take.get(k) || 0) - 1;
+        return leftKAfter === 0 && otherLeftTotal < remainingRoomsAfter;
+      };
+
+      // Phase 2A: Try to give this room at least 2 distinct jenjangs first (1 each from top 2 abundant)
+      const initialSorted = jenjangKeys
+        .filter((k) => (avail.get(k) || 0) > 0)
+        .sort((a, b) => (avail.get(b) || 0) - (avail.get(a) || 0));
+      for (const k of initialSorted) {
+        if (remainingNeed <= 0) break;
+        if ((take.size < 2) && (avail.get(k) || 0) > (take.get(k) || 0)) {
+          take.set(k, (take.get(k) || 0) + 1);
+          remainingNeed--;
+        }
+      }
+
+      // Phase 2B: Fill remaining seats up to capPerGrade, balancing remaining ratios
       while (remainingNeed > 0) {
         const candidates = jenjangKeys
           .filter((k) => {
@@ -282,6 +395,9 @@ function allocateCrossJenjangBuckets(
             return left > 0 && taken < capPerGrade;
           })
           .sort((a, b) => {
+            const starveA = wouldStarveOtherJenjang(a) ? 1 : 0;
+            const starveB = wouldStarveOtherJenjang(b) ? 1 : 0;
+            if (starveA !== starveB) return starveA - starveB;
             const leftA = (avail.get(a) || 0) - (take.get(a) || 0);
             const leftB = (avail.get(b) || 0) - (take.get(b) || 0);
             return leftB - leftA;
@@ -293,15 +409,15 @@ function allocateCrossJenjangBuckets(
         remainingNeed--;
       }
 
-      // If still short (e.g., 1 dominant grade remains), take remaining from available
+      // Phase 2C: If still short (one dominant jenjang globally), pull from most abundant without starving minority
       while (remainingNeed > 0) {
         const candidates = jenjangKeys
           .filter((k) => (avail.get(k) || 0) - (take.get(k) || 0) > 0)
-          .sort(
-            (a, b) =>
-              ((avail.get(b) || 0) - (take.get(b) || 0)) -
-              ((avail.get(a) || 0) - (take.get(a) || 0))
-          );
+          .sort((a, b) => {
+            const leftA = (avail.get(a) || 0) - (take.get(a) || 0);
+            const leftB = (avail.get(b) || 0) - (take.get(b) || 0);
+            return leftB - leftA;
+          });
         if (candidates.length === 0) break;
         const pick = candidates[0];
         take.set(pick, (take.get(pick) || 0) + 1);
@@ -311,7 +427,6 @@ function allocateCrossJenjangBuckets(
       chosenTake = take;
     }
 
-    // Pop assigned students from byJenjang pools
     const roomStudents: Student[] = [];
     chosenTake.forEach((count, key) => {
       const list = byJenjang.get(key) || [];
@@ -320,25 +435,22 @@ function allocateCrossJenjangBuckets(
         if (st) roomStudents.push(st);
       }
     });
-    // Place temporarily into slotOrder bucket
-    buckets[slotOrder.find((s) => buckets[s.idx].length === 0 && s.size === size)?.idx ?? 0] =
-      roomStudents;
+    buckets[targetIdx] = roomStudents;
   }
 
-  // Collect formed non-empty buckets and sort:
-  // 1) Pure 2-jenjang rooms first (lowest room numbers 01, 02...)
-  // 2) Single-jenjang (if small/odd unavoidable)
-  // 3) 3+ jenjang mixed rooms strictly AT THE END (highest room numbers)
+  // Sort formed buckets:
+  // 1) Pure 2-jenjang rooms first (Ruang 01, 02...)
+  // 2) 3+ jenjang mixed rooms AT THE END of multi-jenjang rooms
+  // 3) Unavoidable single-jenjang rooms (only if globally unavoidable)
   const nonEmptyBuckets = buckets.filter((b) => b.length > 0);
   const emptyCount = buckets.length - nonEmptyBuckets.length;
 
   nonEmptyBuckets.sort((a, b) => {
     const distinctA = new Set(a.map((s) => s.jenjang || extractJenjang(s.kelas))).size;
     const distinctB = new Set(b.map((s) => s.jenjang || extractJenjang(s.kelas))).size;
-    const rank = (d: number) => (d === 2 ? 0 : d === 1 ? 1 : 2);
+    const rank = (d: number) => (d === 2 ? 0 : d >= 3 ? 1 : 2);
     const rDiff = rank(distinctA) - rank(distinctB);
     if (rDiff !== 0) return rDiff;
-    // Keep odd-count room toward the end within same rank
     const oddDiff = (a.length % 2) - (b.length % 2);
     if (oddDiff !== 0) return oddDiff;
     return b.length - a.length;
@@ -379,7 +491,8 @@ export function distributeRoomsCrossJenjang(
   rng: () => number = Math.random,
   options?: { examJumlahRuang?: number }
 ): RoomDistributionResult {
-  const maxCap = Math.min(22, Math.max(1, config.kapasitasPerRuang || 22));
+  // Support up to 24 seats (12 meja × 2 kursi) cleanly
+  const maxCap = Math.min(24, Math.max(1, config.kapasitasPerRuang || 22));
   const activeStudents = students.filter((s) => s.status === 'Aktif');
   const warnings: string[] = [];
 
@@ -517,25 +630,34 @@ export function distributeRoomsCrossJenjang(
       }
     }
 
-    // Re-interleave inside each room by jenjang so adjacent seats (1&2, 3&4, 5&6) differ in jenjang
+    // Arrange physical desks per room: every 2-seat desk holds 2 DIFFERENT jenjangs;
+    // any unpaired surplus student sits ALONE on a dedicated desk (12th desk etc. allowed).
     rooms.forEach((room, rIdx) => {
-      const occupants = buildCrossJenjangQueue(roomAllocations[rIdx] || [], rng);
+      const roomPool = roomAllocations[rIdx] || [];
+      const { desks, seatAssignments } = buildCrossJenjangDeskLayout(roomPool, rng);
       const jenjangCounts: Record<string, number> = {};
 
-      occupants.forEach((st, seatIdx) => {
-        const seatNo = seatIdx + 1;
-        assignedRoomMap.set(st.id, { ruangId: room.id, nomorMeja: seatNo });
+      seatAssignments.forEach(({ student: st, nomorMeja }) => {
+        assignedRoomMap.set(st.id, { ruangId: room.id, nomorMeja });
         const jen = st.jenjang || extractJenjang(st.kelas);
         jenjangCounts[jen] = (jenjangCounts[jen] || 0) + 1;
       });
 
-      if (occupants.length > room.kapasitas) {
+      const physicalSeatSpan = desks.length * 2;
+      if (physicalSeatSpan > room.kapasitas && roomPool.length <= 24 && desks.length <= 12) {
+        // Solo desks require up to 12 meja (24 kursi slots) -> adjust room metadata cleanly without false overflow
+        room.jumlahBaris = Math.max(room.jumlahBaris, Math.ceil(physicalSeatSpan / 6));
+      }
+      if (roomPool.length > room.kapasitas) {
         warnings.push(
-          `${room.namaRuang}${sesiKey > 0 ? ` (Sesi ${sesiKey})` : ''}: Jumlah peserta (${occupants.length}) melebihi kapasitas maksimal (${room.kapasitas}).`
+          `${room.namaRuang}${sesiKey > 0 ? ` (Sesi ${sesiKey})` : ''}: Jumlah peserta (${roomPool.length}) melebihi kapasitas maksimal (${room.kapasitas}).`
         );
       }
       const distinctJenjang = Object.keys(jenjangCounts).length;
-      if (occupants.length > 1 && distinctJenjang === 1 && pool.length > occupants.length) {
+      const globalDistinctJenjang = new Set(
+        pool.map((s) => s.jenjang || extractJenjang(s.kelas))
+      ).size;
+      if (roomPool.length > 1 && distinctJenjang === 1 && globalDistinctJenjang >= 2) {
         warnings.push(
           `${room.namaRuang}${sesiKey > 0 ? ` (Sesi ${sesiKey})` : ''}: Seluruh peserta berasal dari 1 jenjang (${Object.keys(jenjangCounts)[0]}).`
         );
@@ -545,7 +667,7 @@ export function distributeRoomsCrossJenjang(
         roomId: room.id,
         nomorRuang: room.nomorRuang,
         sesi: sesiKey > 0 ? sesiKey : undefined,
-        total: occupants.length,
+        total: roomPool.length,
         kapasitas: room.kapasitas,
         jenjangCounts,
       });
@@ -595,13 +717,20 @@ export interface RoomParityAnalysis {
     right: Student;
     jenjang: string;
   }>;
+  soloDeskEntries: Array<{
+    roomName: string;
+    sesi?: number;
+    mejaFisik: number;
+    student: Student;
+  }>;
   recommendReserveRoom: boolean;
   headline: string;
   suggestionText: string;
 }
 
 /**
- * Analyzes room seat parity under 1-Meja-2-Kursi rule and detects same-jenjang desk conflicts.
+ * Analyzes room seat parity under 1-Meja-2-Kursi rule and detects actual physical desk sharing
+ * (grouping strictly by physical desk Math.ceil(nomorMeja / 2) so solo desks are never flagged as conflicts).
  */
 export function analyzeRoomParity(
   students: Student[],
@@ -615,6 +744,7 @@ export function analyzeRoomParity(
 
   const oddEntries: OddRoomEntry[] = [];
   const sameJenjangDeskConflicts: RoomParityAnalysis['sameJenjangDeskConflicts'] = [];
+  const soloDeskEntries: RoomParityAnalysis['soloDeskEntries'] = [];
 
   for (const room of rooms) {
     const isReserveRoom =
@@ -640,20 +770,40 @@ export function analyzeRoomParity(
         });
       }
 
-      for (let i = 0; i + 1 < occupants.length; i += 2) {
-        const left = occupants[i];
-        const right = occupants[i + 1];
-        const jLeft = left.jenjang || extractJenjang(left.kelas);
-        const jRight = right.jenjang || extractJenjang(right.kelas);
-        if (jLeft === jRight) {
-          sameJenjangDeskConflicts.push({
+      // Group occupants by physical desk (1 meja = 2 kursi: 1&2 -> meja 1, 3&4 -> meja 2, etc.)
+      const byDesk = new Map<number, Student[]>();
+      occupants.forEach((st, idx) => {
+        const seatNo = st.nomorMeja || idx + 1;
+        const mejaNo = Math.ceil(seatNo / 2);
+        if (!byDesk.has(mejaNo)) byDesk.set(mejaNo, []);
+        byDesk.get(mejaNo)!.push(st);
+      });
+
+      const sortedDesks = Array.from(byDesk.keys()).sort((a, b) => a - b);
+      for (const mejaFisik of sortedDesks) {
+        const deskStudents = byDesk.get(mejaFisik)!;
+        if (deskStudents.length === 1) {
+          soloDeskEntries.push({
             roomName: room.namaRuang,
             sesi: sesiVal,
-            mejaFisik: Math.floor(i / 2) + 1,
-            left,
-            right,
-            jenjang: jLeft,
+            mejaFisik,
+            student: deskStudents[0],
           });
+        } else if (deskStudents.length >= 2) {
+          const left = deskStudents[0];
+          const right = deskStudents[1];
+          const jLeft = left.jenjang || extractJenjang(left.kelas);
+          const jRight = right.jenjang || extractJenjang(right.kelas);
+          if (jLeft === jRight) {
+            sameJenjangDeskConflicts.push({
+              roomName: room.namaRuang,
+              sesi: sesiVal,
+              mejaFisik,
+              left,
+              right,
+              jenjang: jLeft,
+            });
+          }
         }
       }
     }
@@ -703,6 +853,7 @@ export function analyzeRoomParity(
     nonReserveOddEntries,
     canAutoBalancePairs,
     sameJenjangDeskConflicts,
+    soloDeskEntries,
     recommendReserveRoom,
     headline,
     suggestionText,
@@ -749,12 +900,12 @@ export function balanceOddRooms(
     );
     movedCount++;
 
-    // Re-order cross-jenjang & renumber seats cleanly for both rooms
+    // Re-order cross-jenjang desks & renumber seats cleanly for both rooms (never pairing same jenjang)
     [from.roomId, to.roomId].forEach((rId) => {
-      const occ = buildCrossJenjangQueue(
+      const { seatAssignments } = buildCrossJenjangDeskLayout(
         working.filter((s) => s.status === 'Aktif' && s.ruangId === rId && (!isOnline || (s.sesi || 1) === from.sesi))
       );
-      const seatMap = new Map(occ.map((st, idx) => [st.id, idx + 1]));
+      const seatMap = new Map(seatAssignments.map((a) => [a.student.id, a.nomorMeja]));
       working = working.map((s) =>
         seatMap.has(s.id) ? { ...s, nomorMeja: seatMap.get(s.id) } : s
       );
@@ -791,7 +942,7 @@ export function moveOddStudentsToReserveRoom(
       id: 'room-cadangan',
       nomorRuang: nextNum,
       namaRuang: 'Ruang Cadangan',
-      kapasitas: Math.max(10, Math.min(22, targets.length + 4)),
+      kapasitas: Math.max(10, Math.min(24, targets.length + 4)),
       jumlahBaris: 4,
       jumlahKolom: 6,
       polaTempatDuduk: 'straight',
@@ -811,15 +962,15 @@ export function moveOddStudentsToReserveRoom(
     moveIds.has(s.id) ? { ...s, ruangId: reserveRoom!.id } : s
   );
 
-  // Renumber seats cleanly across all touched rooms + reserve room
+  // Renumber desks cleanly across all touched rooms + reserve room
   const touchedIds = new Set([...targets.map((t) => t.roomId), reserveRoom.id]);
   const sessionList = isOnline ? Array.from({ length: Math.max(1, jumlahSesi) }, (_, i) => i + 1) : [undefined];
   for (const rId of touchedIds) {
     for (const sVal of sessionList) {
-      const occ = buildCrossJenjangQueue(
+      const { seatAssignments } = buildCrossJenjangDeskLayout(
         working.filter((s) => s.status === 'Aktif' && s.ruangId === rId && (!isOnline || (s.sesi || 1) === sVal))
       );
-      const seatMap = new Map(occ.map((st, idx) => [st.id, idx + 1]));
+      const seatMap = new Map(seatAssignments.map((a) => [a.student.id, a.nomorMeja]));
       working = working.map((s) =>
         seatMap.has(s.id) ? { ...s, nomorMeja: seatMap.get(s.id) } : s
       );

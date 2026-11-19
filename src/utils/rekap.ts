@@ -93,19 +93,50 @@ export function computeRoomEquipmentRows(params: {
     let pesertaSerentak = totalPesertaTerdaftar;
     let activeSessionsInRoom = totalPesertaTerdaftar > 0 ? 1 : 0;
 
+    const sessionBuckets = new Map<number, Student[]>();
     if (isOnline) {
-      const sessionCounts = new Map<number, number>();
       for (const st of inRoom) {
         const s = st.sesi || 1;
-        sessionCounts.set(s, (sessionCounts.get(s) || 0) + 1);
+        if (!sessionBuckets.has(s)) sessionBuckets.set(s, []);
+        sessionBuckets.get(s)!.push(st);
       }
-      const counts = Array.from(sessionCounts.values());
+      const counts = Array.from(sessionBuckets.values()).map((arr) => arr.length);
       pesertaSerentak = counts.length > 0 ? Math.max(...counts) : 0;
       activeSessionsInRoom = counts.length;
+    } else if (inRoom.length > 0) {
+      sessionBuckets.set(1, inRoom);
+    }
+
+    let peakPhysicalDesks = 0;
+    if (kursiPerMeja === 2) {
+      sessionBuckets.forEach((sessStudents) => {
+        const distinctJenjang = new Set(
+          sessStudents.map((st) => st.jenjang || st.kelas.split(/[- ]/)[0])
+        ).size;
+        const distinctDesks = new Set(
+          sessStudents.map((st, idx) =>
+            st.nomorMeja ? Math.ceil(st.nomorMeja / 2) : Math.floor(idx / 2) + 1
+          )
+        ).size;
+        const maxSeatDesk = sessStudents.reduce(
+          (mx, st) => (st.nomorMeja ? Math.max(mx, Math.ceil(st.nomorMeja / 2)) : mx),
+          0
+        );
+        const sessDesks =
+          distinctJenjang >= 2 && sessStudents.some((st) => st.nomorMeja === 1)
+            ? Math.max(Math.ceil(sessStudents.length / 2), distinctDesks, maxSeatDesk)
+            : Math.ceil(sessStudents.length / 2);
+        if (sessDesks > peakPhysicalDesks) peakPhysicalDesks = sessDesks;
+      });
     }
 
     const kursiPeserta = basis === 'kapasitas_ruang' ? r.kapasitas : pesertaSerentak;
-    const mejaPeserta = kursiPeserta > 0 ? Math.ceil(kursiPeserta / kursiPerMeja) : 0;
+    const mejaPeserta =
+      kursiPeserta > 0
+        ? basis === 'peserta_aktif' && kursiPerMeja === 2
+          ? Math.max(Math.ceil(kursiPeserta / kursiPerMeja), peakPhysicalDesks)
+          : Math.ceil(kursiPeserta / kursiPerMeja)
+        : 0;
 
     // Standar madrasah: 2 pengawas per ruang (atau sesuai yang ditugaskan); 1 meja pengawas untuk 2 kursi pengawas
     const assignedSupCount = (r.pengawas1Id ? 1 : 0) + (r.pengawas2Id ? 1 : 0);

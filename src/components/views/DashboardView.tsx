@@ -121,7 +121,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     },
     {
       id: 'ruang_meja',
-      title: 'Pembagian Ruang & Tempat Duduk (Maks 22)',
+      title: 'Pembagian Ruang & Tempat Duduk (Maks 24 / 12 Meja)',
       detail:
         rooms.length > 0
           ? `${rooms.length} ruang terbentuk — ${seatedCount}/${activeStudents.length} peserta ternomor meja`
@@ -221,7 +221,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="mt-1 text-xs text-slate-500 tabular-nums">
             {examConfig.moda === 'online'
-              ? `${examConfig.jumlahSesi} Sesi Online \u2022 Kapasitas maks 22/ruang`
+              ? `${examConfig.jumlahSesi} Sesi Online \u2022 Kapasitas maks 24/ruang`
               : `Total ${rooms.reduce((a, r) => a + r.kapasitas, 0)} kursi`}
           </div>
         </div>

@@ -116,7 +116,7 @@ export const RuangSesiView: React.FC<RuangSesiViewProps> = ({
     }
     const cleanCfg: RoomDistributionConfig = {
       ...localConfig,
-      kapasitasPerRuang: Math.min(22, Math.max(1, localConfig.kapasitasPerRuang || 22)),
+      kapasitasPerRuang: Math.min(24, Math.max(1, localConfig.kapasitasPerRuang || 22)),
     };
     const res = distributeRoomsCrossJenjang(
       students,
@@ -181,7 +181,11 @@ export const RuangSesiView: React.FC<RuangSesiViewProps> = ({
       (s) => s.ruangId === targetRoomId && s.status === 'Aktif' && s.id !== movingStudent.id && (!isOnline || s.sesi === targetSesi)
     );
     const targetRoom = rooms.find((r) => r.id === targetRoomId);
-    const nextSeat = roomOccupants.length + 1;
+    const maxExistingSeat = roomOccupants.reduce(
+      (mx, s) => Math.max(mx, s.nomorMeja || 0),
+      0
+    );
+    const nextSeat = Math.max(roomOccupants.length + 1, maxExistingSeat + 1);
 
     const updated = students.map((s) =>
       s.id === movingStudent.id
@@ -246,9 +250,9 @@ export const RuangSesiView: React.FC<RuangSesiViewProps> = ({
       <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200">
           <div>
-            <h2 className="text-base font-bold text-slate-900">Pembagian Ruang Ujian (Maks 22 Kursi / Silang Jenjang 11:11)</h2>
+            <h2 className="text-base font-bold text-slate-900">Pembagian Ruang Ujian (Silang Jenjang • Hingga 12 Meja / 24 Kursi)</h2>
             <p className="text-xs text-slate-500">
-              Menyeimbangkan campuran jenjang 11:11 per ruang (adaptif jika 20/21 peserta) dan memastikan nol peserta terlewat.
+              Setiap ruang diprioritaskan berisi 2 jenjang berbeda (campuran 3 jenjang diletakkan di ruang akhir). Meja 2 kursi selalu diisi jenjang berbeda; jika satu jenjang lebih banyak, siswa sisa duduk sendiri di meja tambahan hingga 12 meja.
             </p>
           </div>
           {canEdit && (
@@ -299,17 +303,17 @@ export const RuangSesiView: React.FC<RuangSesiViewProps> = ({
             </select>
           </div>
           <div>
-            <label className="block font-semibold text-slate-700 mb-1">Kapasitas Maksimal Per Ruang (Maks 22)</label>
+            <label className="block font-semibold text-slate-700 mb-1">Kapasitas Maksimal Per Ruang (Maks 24 / 12 Meja)</label>
             <input
               type="number"
               min={1}
-              max={22}
+              max={24}
               disabled={!canEdit}
               value={localConfig.kapasitasPerRuang}
               onChange={(e) =>
                 setLocalConfig({
                   ...localConfig,
-                  kapasitasPerRuang: Math.min(22, Math.max(1, Number(e.target.value) || 22)),
+                  kapasitasPerRuang: Math.min(24, Math.max(1, Number(e.target.value) || 22)),
                 })
               }
               className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono tabular-nums"
@@ -382,6 +386,20 @@ export const RuangSesiView: React.FC<RuangSesiViewProps> = ({
           </div>
         </div>
       )}
+      {parityAnalysis.soloDeskEntries.length > 0 &&
+        parityAnalysis.sameJenjangDeskConflicts.length === 0 && (
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 px-4 py-3 rounded-xl text-xs flex items-start gap-2.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold">
+                Semua Meja Terjaga Silang Jenjang (0 Meja Satu Jenjang)
+              </p>
+              <p className="text-emerald-800 mt-0.5">
+                Terdapat <strong>{parityAnalysis.soloDeskEntries.length} meja</strong> yang diset duduk sendiri (1 peserta/meja) untuk menampung selisih jenjang agar tidak ada 2 siswa berjenjang sama duduk bersebelahan.
+              </p>
+            </div>
+          </div>
+        )}
 
       {/* Room Cards Summary */}
       {rooms.length === 0 ? (
@@ -420,6 +438,15 @@ export const RuangSesiView: React.FC<RuangSesiViewProps> = ({
                   </div>
                   <p className="text-xs text-slate-500 tabular-nums">
                     Terisi: <strong>{roomStudents.length}</strong> / {room.kapasitas} kursi
+                    {' • '}
+                    <strong>
+                      {Math.max(
+                        Math.ceil(roomStudents.length / 2),
+                        ...roomStudents.map((s) => (s.nomorMeja ? Math.ceil(s.nomorMeja / 2) : 0)),
+                        0
+                      )}{' '}
+                      Meja
+                    </strong>
                     {isOnline ? ` (tersebar di ${examConfig.jumlahSesi} sesi)` : ''}
                   </p>
                 </div>

@@ -210,3 +210,81 @@ test('Rekap: adapts furniture and supplies cleanly to Moda Online vs Moda Kertas
   assert.equal(kertasDup.totalPeserta, 22);
   assert.equal(kertasDup.totalSoal > 22, true);
 });
+
+test('Rekap: counts 12 physical desks when a cross-jenjang room of 22 uses solo desks (#21 and #23)', () => {
+  // 10 paired desks (10 X + 10 XI -> #1..#20) + 2 solo X desks (#21, #23) = 22 students, 12 desks
+  const soloRoomStudents: Student[] = [
+    ...Array.from({ length: 10 }, (_, idx) => ({
+      id: `sx-${idx + 1}`,
+      nis: `10${idx + 1}`,
+      nisn: `00900001${String(idx + 1).padStart(2, '0')}`,
+      nama: `X ${idx + 1}`,
+      tempatLahir: 'Kota',
+      tanggalLahir: '2010-01-01',
+      jenisKelamin: 'L' as const,
+      kelas: 'X-A',
+      jenjang: 'X',
+      nomorPeserta: `26-01-${String(idx * 2 + 1).padStart(3, '0')}`,
+      ruangId: 'room-1',
+      nomorMeja: idx * 2 + 1,
+      status: 'Aktif' as const,
+    })),
+    ...Array.from({ length: 10 }, (_, idx) => ({
+      id: `sxi-${idx + 1}`,
+      nis: `20${idx + 1}`,
+      nisn: `00900002${String(idx + 1).padStart(2, '0')}`,
+      nama: `XI ${idx + 1}`,
+      tempatLahir: 'Kota',
+      tanggalLahir: '2009-01-01',
+      jenisKelamin: 'P' as const,
+      kelas: 'XI-A',
+      jenjang: 'XI',
+      nomorPeserta: `26-01-${String(idx * 2 + 2).padStart(3, '0')}`,
+      ruangId: 'room-1',
+      nomorMeja: idx * 2 + 2,
+      status: 'Aktif' as const,
+    })),
+    {
+      id: 'sx-11',
+      nis: '111',
+      nisn: '0090000111',
+      nama: 'X 11',
+      tempatLahir: 'Kota',
+      tanggalLahir: '2010-01-01',
+      jenisKelamin: 'L' as const,
+      kelas: 'X-A',
+      jenjang: 'X',
+      nomorPeserta: '26-01-021',
+      ruangId: 'room-1',
+      nomorMeja: 21,
+      status: 'Aktif' as const,
+    },
+    {
+      id: 'sx-12',
+      nis: '112',
+      nisn: '0090000112',
+      nama: 'X 12',
+      tempatLahir: 'Kota',
+      tanggalLahir: '2010-01-01',
+      jenisKelamin: 'L' as const,
+      kelas: 'X-A',
+      jenjang: 'X',
+      nomorPeserta: '26-01-023',
+      ruangId: 'room-1',
+      nomorMeja: 23,
+      status: 'Aktif' as const,
+    },
+  ];
+
+  const rows = computeRoomEquipmentRows({
+    rooms: [TEST_ROOMS[0]],
+    students: soloRoomStudents,
+    examConfig: { ...TEST_EXAM_CONFIG, moda: 'kertas', jumlahSesi: 1 },
+    rekapConfig: { ...TEST_REKAP_CONFIG, kursiPerMeja: 2, basisHitungKursi: 'peserta_aktif' },
+  });
+
+  assert.equal(rows[0].kursiPeserta, 22);
+  assert.equal(rows[0].mejaPeserta, 12);
+  assert.equal(rows[0].totalKursi > rows[0].totalMeja, true);
+});
+

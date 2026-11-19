@@ -412,7 +412,7 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
     try {
       const cleanConfig: RoomDistributionConfig = {
         ...localRoomConfig,
-        kapasitasPerRuang: Math.min(22, Math.max(1, localRoomConfig.kapasitasPerRuang || 22)),
+        kapasitasPerRuang: Math.min(24, Math.max(1, localRoomConfig.kapasitasPerRuang || 22)),
       };
       const res = distributeRoomsCrossJenjang(
         students,
@@ -461,7 +461,7 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
           : stepNomor;
       const cleanRoomCfg: RoomDistributionConfig = {
         ...localRoomConfig,
-        kapasitasPerRuang: Math.min(22, Math.max(1, localRoomConfig.kapasitasPerRuang || 22)),
+        kapasitasPerRuang: Math.min(24, Math.max(1, localRoomConfig.kapasitasPerRuang || 22)),
       };
       const roomRes = distributeRoomsCrossJenjang(
         stepSesi,
@@ -742,16 +742,16 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
               />
             </div>
             <div>
-              <label className="block font-semibold text-slate-600 mb-1">Kapasitas / Ruang</label>
+              <label className="block font-semibold text-slate-600 mb-1">Kapasitas / Ruang (Maks 24)</label>
               <input
                 type="number"
                 min={1}
-                max={22}
+                max={24}
                 value={localRoomConfig.kapasitasPerRuang}
                 onChange={(e) =>
                   setLocalRoomConfig({
                     ...localRoomConfig,
-                    kapasitasPerRuang: Math.min(22, Math.max(1, Number(e.target.value) || 20)),
+                    kapasitasPerRuang: Math.min(24, Math.max(1, Number(e.target.value) || 22)),
                   })
                 }
                 className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-mono tabular-nums"

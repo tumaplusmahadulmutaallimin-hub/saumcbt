@@ -105,16 +105,38 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
       const [roomId, sesiStr] = gKey.split('__');
       const room = roomId !== 'unassigned' ? roomMap.get(roomId) : undefined;
       const sesiNum = Number(sesiStr) || undefined;
-      for (let i = 0; i < groupStudents.length; i += 2) {
-        pairs.push({
-          key: `${gKey}-${i}`,
-          room,
-          sesi: sesiNum,
-          mejaFisikNo: Math.floor(i / 2) + 1,
-          left: groupStudents[i],
-          right: groupStudents[i + 1],
+
+      const hasExplicitSeats = groupStudents.some((s) => Boolean(s.nomorMeja));
+      const deskMap = new Map<number, { left?: Student; right?: Student }>();
+      groupStudents.forEach((st, idx) => {
+        const seatNo = hasExplicitSeats && st.nomorMeja ? st.nomorMeja : idx + 1;
+        const deskNo = Math.ceil(seatNo / 2);
+        if (!deskMap.has(deskNo)) deskMap.set(deskNo, {});
+        const slot = deskMap.get(deskNo)!;
+        const isEvenSeat = seatNo % 2 === 0;
+        if (!isEvenSeat && !slot.left) {
+          slot.left = st;
+        } else if (isEvenSeat && !slot.right) {
+          slot.right = st;
+        } else if (!slot.left) {
+          slot.left = st;
+        } else {
+          slot.right = st;
+        }
+      });
+
+      Array.from(deskMap.entries())
+        .sort((a, b) => a[0] - b[0])
+        .forEach(([deskNo, slot]) => {
+          pairs.push({
+            key: `${gKey}-desk-${deskNo}`,
+            room,
+            sesi: sesiNum,
+            mejaFisikNo: deskNo,
+            left: slot.left,
+            right: slot.right,
+          });
         });
-      }
     });
 
     const chunkSize = 6;

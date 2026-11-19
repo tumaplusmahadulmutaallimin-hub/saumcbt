@@ -66,8 +66,7 @@ export const DenahRuangCetak: React.FC<DenahRuangCetakProps> = ({
                 s.status === 'Aktif' &&
                 (sesi === undefined || s.sesi === sesi)
             )
-            .sort((a, b) => (a.nomorMeja || 999) - (b.nomorMeja || 999))
-            .slice(0, 22); // Max 22 seats per room
+            .sort((a, b) => (a.nomorMeja || 999) - (b.nomorMeja || 999));
 
           // Skip rendering empty session-room pairs when a room has 0 students in that session (unless only 1 session)
           if (roomStudents.length === 0 && sessionList.length > 1) return null;
@@ -78,18 +77,36 @@ export const DenahRuangCetak: React.FC<DenahRuangCetakProps> = ({
           const p1 = room.pengawas1Id ? formatPersonNameAndTitle(supervisorMap.get(room.pengawas1Id)?.nama) : undefined;
           const p2 = room.pengawas2Id ? formatPersonNameAndTitle(supervisorMap.get(room.pengawas2Id)?.nama) : undefined;
 
+          // Map students strictly by explicit nomorMeja so solo desks (e.g. #21, #23) keep their physical desk slots
+          const hasExplicitSeats = roomStudents.some((s) => Boolean(s.nomorMeja));
+          const studentBySeat = new Map<number, Student>();
+          roomStudents.forEach((st, idx) => {
+            let seat = hasExplicitSeats && st.nomorMeja ? st.nomorMeja : idx + 1;
+            while (studentBySeat.has(seat)) seat++;
+            studentBySeat.set(seat, st);
+          });
+
+          const maxAssignedSeat = Math.max(roomStudents.length, ...Array.from(studentBySeat.keys()), 0);
+          const desksUsed = Math.max(
+            Math.ceil(roomStudents.length / 2),
+            ...Array.from(studentBySeat.keys()).map((seat) => Math.ceil(seat / 2)),
+            0
+          );
+          const soloDeskCount = Array.from(studentBySeat.keys()).filter(
+            (seat) => seat % 2 === 1 && !studentBySeat.has(seat + 1)
+          ).length;
+
           // Build rows of 6 seats: [col 0, col 1] [GAP] [col 2, col 3] [GAP] [col 4, col 5]
-          // ONLY occupied seats are rendered (no empty boxes!). Any missing trailing slot renders blank space.
-          const totalSeats = roomStudents.length;
-          const numRows = Math.ceil(totalSeats / 6);
-          const seatRows: Array<Array<Student | null>> = [];
+          const numRows = Math.ceil(maxAssignedSeat / 6);
+          const seatRows: Array<Array<{ seatNo: number; student: Student | null; isSoloPartnerEmpty: boolean }>> = [];
           for (let r = 0; r < numRows; r++) {
-            const rowSeats: Array<Student | null> = [];
+            const rowSeats: Array<{ seatNo: number; student: Student | null; isSoloPartnerEmpty: boolean }> = [];
             for (let c = 0; c < 6; c++) {
               const targetSeatNo = r * 6 + c + 1;
-              // Match student by nomorMeja if sequential within 1..22, else positional fallback
-              const st = roomStudents[r * 6 + c] || roomStudents.find((x) => x.nomorMeja === targetSeatNo) || null;
-              rowSeats.push(st);
+              const st = studentBySeat.get(targetSeatNo) || null;
+              const isSoloPartnerEmpty =
+                !st && targetSeatNo % 2 === 0 && studentBySeat.has(targetSeatNo - 1);
+              rowSeats.push({ seatNo: targetSeatNo, student: st, isSoloPartnerEmpty });
             }
             seatRows.push(rowSeats);
           }
@@ -113,7 +130,8 @@ export const DenahRuangCetak: React.FC<DenahRuangCetakProps> = ({
                     {sesi ? ` • SESI ${sesi}` : ''} — {(profile.jenisUjian || 'UJIAN MADRASAH').toUpperCase()}
                   </p>
                   <p className="text-[10.5px] text-slate-700">
-                    Tahun Pelajaran {profile.tahunPelajaran} • Jumlah Peserta: {roomStudents.length} Orang
+                    Tahun Pelajaran {profile.tahunPelajaran} • Jumlah Peserta: {roomStudents.length} Orang • {desksUsed} Meja
+                    {soloDeskCount > 0 ? ` (${soloDeskCount} Meja Duduk Sendiri)` : ''}
                   </p>
 
                   {/* Actual non-contiguous participant number ranges grouped by class */}
@@ -150,19 +168,40 @@ export const DenahRuangCetak: React.FC<DenahRuangCetakProps> = ({
                       )}
                     </div>
                     <div className="text-[9.5px] font-mono text-slate-600 text-right">
-                      6 Kursi / Baris • Maks 22
+                      6 Kursi / Baris • {desksUsed} Meja ({roomStudents.length} Peserta)
                     </div>
                   </div>
 
-                  {/* EXACT 6-column seating grid with 2 clean blank aisle gaps (NO "GANG" text, NO icons, NO empty boxes) */}
+                  {/* EXACT 6-column seating grid with 2 clean blank aisle gaps */}
                   <div className="space-y-2.5">
                     {seatRows.map((rowSeats, rIdx) => {
                       // 8 CSS columns: [S1] [S2] [blank gap 10px] [S3] [S4] [blank gap 10px] [S5] [S6]
-                      const renderSeatBox = (st: Student | null, slotIdx: number) => {
+                      const renderSeatBox = (
+                        cell: { seatNo: number; student: Student | null; isSoloPartnerEmpty: boolean },
+                        slotIdx: number
+                      ) => {
+                        const { seatNo, student: st, isSoloPartnerEmpty } = cell;
                         if (!st) {
+                          if (isSoloPartnerEmpty) {
+                            return (
+                              <div
+                                key={`solo-empty-${rIdx}-${slotIdx}`}
+                                className="border border-dashed border-slate-400 bg-slate-50/70 p-1.5 flex flex-col items-center justify-center min-h-[68px] text-center"
+                              >
+                                <span className="font-mono text-[8px] font-bold text-slate-400">
+                                  #{String(seatNo).padStart(2, '0')}
+                                </span>
+                                <span className="text-[8px] font-semibold text-slate-500 mt-0.5 leading-tight">
+                                  Kursi Kosong
+                                </span>
+                                <span className="text-[7px] text-slate-400">
+                                  (Duduk Sendiri)
+                                </span>
+                              </div>
+                            );
+                          }
                           return <div key={`blank-${rIdx}-${slotIdx}`} aria-hidden="true" />;
                         }
-                        const deskNumber = rIdx * 6 + slotIdx + 1;
                         return (
                           <div
                             key={`seat-${st.id}`}
@@ -171,10 +210,10 @@ export const DenahRuangCetak: React.FC<DenahRuangCetakProps> = ({
                             {/* Top: Nomor Peserta */}
                             <div className="flex items-center justify-between gap-1 border-b border-slate-300 pb-0.5">
                               <span className="font-mono text-[9.5px] font-extrabold text-slate-950 tracking-tight tabular-nums">
-                                {st.nomorPeserta || `M-${String(deskNumber).padStart(2, '0')}`}
+                                {st.nomorPeserta || `M-${String(seatNo).padStart(2, '0')}`}
                               </span>
                               <span className="font-mono text-[8px] font-bold text-slate-600">
-                                #{String(st.nomorMeja || deskNumber).padStart(2, '0')}
+                                #{String(st.nomorMeja || seatNo).padStart(2, '0')}
                               </span>
                             </div>
 
