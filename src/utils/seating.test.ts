@@ -5,6 +5,7 @@ import {
   calculateRequiredRooms,
   distributeRoomsCrossJenjang,
   distributeStudents,
+  generateValidatedRoomPlan,
   getOrderedSeats,
   getRoomFacilityTotals,
   moveOddStudentsToReserveRoom,
@@ -12,6 +13,7 @@ import {
   normalizeRoomFacilities,
   previewRoomDistribution,
   swapPhysicalDesksInRoom,
+  validateGenerateFeasibility,
   validateRoomDistribution,
 } from './seating';
 import { ExamRoom, Student } from '../types';
@@ -502,5 +504,157 @@ test('Edit Denah moveOrSwapStudentSeat blocks same-jenjang desk pairing and allo
   assert.equal(deskSwapped.find((s) => s.id === 's2')?.nomorMeja, 4);
   assert.equal(deskSwapped.find((s) => s.id === 's4')?.nomorMeja, 2);
 });
+
+test('Section 9A: 173 peserta, 4 ruang, 1 sesi MUST REJECT generate before any allocation', () => {
+  const mk = (count: number, jenjang: string, offset: number): Student[] =>
+    Array.from({ length: count }, (_, i) => ({
+      id: `${jenjang}-173-${i + 1}`,
+      nis: `${offset + i}`,
+      nisn: `0173${jenjang}${String(i + 1).padStart(3, '0')}`,
+      nama: `Siswa ${jenjang} ${i + 1}`,
+      tempatLahir: 'Kota',
+      tanggalLahir: '2009-01-01',
+      jenisKelamin: i % 2 === 0 ? 'L' : 'P',
+      kelas: `${jenjang}-A`,
+      jenjang,
+      nomorPeserta: `26-${jenjang}-${String(i + 1).padStart(3, '0')}`,
+      status: 'Aktif',
+    }));
+
+  const students = [
+    ...mk(60, 'X', 1),
+    ...mk(58, 'XI', 101),
+    ...mk(55, 'XII', 201),
+  ];
+  assert.equal(students.length, 173);
+
+  const feasibility = validateGenerateFeasibility(students, [], 4, 1);
+  assert.equal(feasibility.isFeasible, false);
+  assert.equal(feasibility.totalActiveStudents, 173);
+  assert.equal(feasibility.jumlahRuang, 4);
+  assert.equal(feasibility.jumlahSesi, 1);
+  assert.equal(feasibility.totalKapasitasMaks, 96);
+  assert.equal(feasibility.unaccommodatedCount, 77);
+  assert.equal(feasibility.recommendedMinSesi, 2);
+  assert.equal(feasibility.recommendedMinRuang, 8);
+  assert.equal(feasibility.reasons.length > 0, true);
+
+  const plan = generateValidatedRoomPlan(
+    students,
+    [],
+    { kapasitasPerRuang: 22, metode: 'silang_jenjang_11_11', jumlahRuangManual: 4 },
+    'kertas',
+    4,
+    1,
+    () => 0.4
+  );
+  assert.equal(plan.accepted, false);
+  assert.equal(plan.distribution, null);
+  assert.equal(plan.validation, null);
+});
+
+test('Section 9B: 173 peserta, 4 ruang, 2 sesi MUST ACCEPT and partition cleanly across Ruang 01..04 with 0 conflicts', () => {
+  const mk = (count: number, jenjang: string, offset: number): Student[] =>
+    Array.from({ length: count }, (_, i) => ({
+      id: `${jenjang}-s2-${i + 1}`,
+      nis: `${offset + i}`,
+      nisn: `0273${jenjang}${String(i + 1).padStart(3, '0')}`,
+      nama: `Siswa ${jenjang} ${i + 1}`,
+      tempatLahir: 'Kota',
+      tanggalLahir: '2009-01-01',
+      jenisKelamin: i % 2 === 0 ? 'L' : 'P',
+      kelas: `${jenjang}-A`,
+      jenjang,
+      nomorPeserta: `26-${jenjang}-${String(i + 1).padStart(3, '0')}`,
+      status: 'Aktif',
+    }));
+
+  const students = [
+    ...mk(60, 'X', 1),
+    ...mk(58, 'XI', 101),
+    ...mk(55, 'XII', 201),
+  ];
+
+  const plan = generateValidatedRoomPlan(
+    students,
+    [],
+    { kapasitasPerRuang: 22, metode: 'silang_jenjang_11_11', jumlahRuangManual: 4 },
+    'kertas',
+    4,
+    2,
+    () => 0.35
+  );
+
+  assert.equal(plan.accepted, true);
+  if (!plan.accepted) return;
+
+  assert.equal(plan.feasibility.totalKapasitasMaks, 192);
+  assert.equal(plan.distribution.updatedRooms.length, 4);
+  assert.equal(plan.validation.isValid, true);
+  assert.equal(plan.validation.errors.length, 0);
+
+  const allocated = plan.distribution.updatedStudents;
+  assert.equal(allocated.length, 173);
+
+  const sesi1 = allocated.filter((s) => s.sesi === 1);
+  const sesi2 = allocated.filter((s) => s.sesi === 2);
+  assert.equal(sesi1.length + sesi2.length, 173);
+  assert.equal(Math.abs(sesi1.length - sesi2.length) <= 1, true);
+
+  // Zero duplicate IDs & every student placed in Ruang 01..04
+  const ids = new Set(allocated.map((s) => s.id));
+  assert.equal(ids.size, 173);
+  const validRoomIds = new Set(plan.distribution.updatedRooms.map((r) => r.id));
+  assert.equal(allocated.every((s) => s.ruangId && validRoomIds.has(s.ruangId) && (s.nomorMeja || 0) >= 1), true);
+
+  // Zero same-jenjang desk conflicts across both sessions
+  assert.equal(
+    plan.validation.roomMetrics.every((m) => m.sameJenjangConflicts === 0 && m.seatCollisions === 0 && m.studentCount <= 24),
+    true
+  );
+});
+
+test('Section 9C: 185 peserta across 4 ruang × 2 sesi validates 23 solo & 24 paired desk capacities without errors', () => {
+  const mk = (count: number, jenjang: string, offset: number): Student[] =>
+    Array.from({ length: count }, (_, i) => ({
+      id: `${jenjang}-185-${i + 1}`,
+      nis: `${offset + i}`,
+      nisn: `0185${jenjang}${String(i + 1).padStart(3, '0')}`,
+      nama: `Siswa ${jenjang} ${i + 1}`,
+      tempatLahir: 'Kota',
+      tanggalLahir: '2009-01-01',
+      jenisKelamin: 'L',
+      kelas: `${jenjang}-A`,
+      jenjang,
+      nomorPeserta: `26-${jenjang}-${String(i + 1).padStart(3, '0')}`,
+      status: 'Aktif',
+    }));
+
+  // 185 = 4 rooms * 23 (Sesi 1 = 93 -> 24,23,23,23) + 4 rooms * 23 (Sesi 2 = 92 -> 23,23,23,23)
+  const students = [
+    ...mk(63, 'X', 1),
+    ...mk(62, 'XI', 101),
+    ...mk(60, 'XII', 201),
+  ];
+
+  const plan = generateValidatedRoomPlan(
+    students,
+    [],
+    { kapasitasPerRuang: 22, metode: 'silang_jenjang_11_11', jumlahRuangManual: 4 },
+    'kertas',
+    4,
+    2,
+    () => 0.45
+  );
+
+  assert.equal(plan.accepted, true);
+  if (!plan.accepted) return;
+
+  assert.equal(plan.validation.isValid, true);
+  assert.equal(plan.validation.errors.length, 0);
+  assert.equal(plan.validation.roomMetrics.some((m) => m.studentCount === 24), true);
+  assert.equal(plan.validation.roomMetrics.some((m) => m.studentCount === 23 && m.soloDesks === 1), true);
+});
+
 
 

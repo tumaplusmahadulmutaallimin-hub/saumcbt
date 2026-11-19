@@ -83,9 +83,14 @@ export const ManajemenMejaKursiPanel: React.FC<ManajemenMejaKursiPanelProps> = (
     [students]
   );
 
+  const hasSessions =
+    examConfig.moda === 'online' ||
+    (examConfig.jumlahSesi || 1) > 1 ||
+    activeStudents.some((s) => (s.sesi || 1) > 1);
+
   const getRoomUsage = (roomId: string) => {
     const occupants = activeStudents.filter((s) => s.ruangId === roomId);
-    if (examConfig.moda === 'online') {
+    if (hasSessions) {
       // Peak session occupancy determines minimum chairs/desks needed physically
       const bySesi = new Map<number, Student[]>();
       occupants.forEach((s) => {

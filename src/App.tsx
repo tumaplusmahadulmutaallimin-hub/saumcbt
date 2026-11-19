@@ -102,6 +102,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<SaumModuleKey>('dashboard');
   const [activeDocSubtype, setActiveDocSubtype] = useState<DocumentType>('denah_ruang');
   const [activeRoomContextId, setActiveRoomContextId] = useState<string>('all');
+  const [activeSesiContext, setActiveSesiContext] = useState<number | undefined>(undefined);
   const [ruangSesiTab, setRuangSesiTab] = useState<RuangSesiSubTab>('generate');
   const [pengaturanTab, setPengaturanTab] = useState<'madrasah_kop' | 'kertas' | 'panitia' | 'akses'>('madrasah_kop');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -162,7 +163,7 @@ export default function App() {
     }
   };
 
-  const navigateTo = (tab: string, docSubtype?: string, roomId?: string) => {
+  const navigateTo = (tab: string, docSubtype?: string, roomId?: string, sesi?: number) => {
     const key = tab as SaumModuleKey;
     if (!canRoleView(currentUser.role, key)) {
       setGlobalError(`Peran "${currentUser.role}" tidak memiliki akses ke modul ini.`);
@@ -171,6 +172,7 @@ export default function App() {
     setActiveTab(key);
     if (docSubtype) setActiveDocSubtype(docSubtype as DocumentType);
     if (roomId) setActiveRoomContextId(roomId);
+    setActiveSesiContext(sesi);
     setMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -322,7 +324,9 @@ export default function App() {
             <span className="hidden md:inline-block text-xs font-semibold text-slate-600 border border-slate-200 bg-slate-50 px-2.5 py-1 rounded-md whitespace-nowrap">
               {state.examConfig.moda === 'online'
                 ? `Online • ${state.examConfig.jumlahSesi} Sesi`
-                : 'Moda Kertas'}
+                : state.examConfig.jumlahSesi > 1
+                  ? `Kertas • ${state.examConfig.jumlahSesi} Sesi`
+                  : 'Moda Kertas'}
             </span>
 
             <select
@@ -557,7 +561,7 @@ export default function App() {
                       }));
                     });
                   }}
-                  onNavigateToDenah={(roomId) => navigateTo('denah_ruang', undefined, roomId)}
+                  onNavigateToDenah={(roomId, sesi) => navigateTo('denah_ruang', undefined, roomId, sesi)}
                 />
               )}
 
@@ -597,6 +601,7 @@ export default function App() {
                   paperPreset={state.paperPresets.find((p) => p.id === 'denah_duduk')}
                   canEdit={canRoleEdit(currentUser.role, 'denah_ruang')}
                   initialRoomId={activeRoomContextId !== 'all' ? activeRoomContextId : undefined}
+                  initialSesi={activeSesiContext}
                   onSaveRooms={async (payload) => {
                     await withErrorCatch(async () => {
                       const res = await saumApi.saveRooms(payload);
@@ -605,6 +610,7 @@ export default function App() {
                         students: res.students,
                         rooms: res.rooms,
                         roomConfig: res.roomConfig,
+                        examConfig: res.examConfig,
                         auditLogs: res.auditLogs,
                       }));
                     });

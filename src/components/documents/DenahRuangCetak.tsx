@@ -63,15 +63,18 @@ export const DenahRuangCetak: React.FC<DenahRuangCetakProps> = ({
       (!selectedRoomId || selectedRoomId === 'all' || r.id === selectedRoomId)
   );
 
-  // Determine sessions to print: if online and selectedSesi not specified, print per session if students exist in multiple sessions
+  // Determine sessions to print: separate per session whenever moda === 'online', jumlahSesi > 1, or multiple sessions exist
   const isOnline = examConfig?.moda === 'online';
+  const distinctStudentSessions = Array.from(
+    new Set(students.filter((s) => s.status === 'Aktif' && s.sesi).map((s) => s.sesi as number))
+  ).sort((a, b) => a - b);
+  const useSessions =
+    isOnline || (examConfig?.jumlahSesi || 1) > 1 || distinctStudentSessions.length > 1;
   const sessionList: Array<number | undefined> = (() => {
-    if (!isOnline) return [undefined];
+    if (!useSessions) return [undefined];
     if (selectedSesi && selectedSesi > 0) return [selectedSesi];
-    const distinct = Array.from(
-      new Set(students.filter((s) => s.status === 'Aktif' && s.sesi).map((s) => s.sesi as number))
-    ).sort((a, b) => a - b);
-    return distinct.length > 0 ? distinct : [1];
+    if (distinctStudentSessions.length > 0) return distinctStudentSessions;
+    return Array.from({ length: Math.max(1, examConfig?.jumlahSesi || 1) }, (_, i) => i + 1);
   })();
 
   const sheetStyle = getSheetScreenStyle(paperPreset);
@@ -88,8 +91,8 @@ export const DenahRuangCetak: React.FC<DenahRuangCetakProps> = ({
 
   return (
     <div className="w-full flex flex-col items-center">
-      {activeRooms.flatMap((room) =>
-        sessionList.map((sesi) => {
+      {sessionList.flatMap((sesi) =>
+        activeRooms.map((room) => {
           const roomStudents = students
             .filter(
               (s) =>
@@ -99,7 +102,7 @@ export const DenahRuangCetak: React.FC<DenahRuangCetakProps> = ({
             )
             .sort((a, b) => (a.nomorMeja || 999) - (b.nomorMeja || 999));
 
-          // Skip rendering empty session-room pairs when a room has 0 students in that session (unless only 1 session)
+          // Skip rendering empty session-room pairs when printing multiple sessions
           if (roomStudents.length === 0 && sessionList.length > 1) return null;
 
           const classRanges = computeClassRangesInRoom(roomStudents, students);
@@ -135,15 +138,20 @@ export const DenahRuangCetak: React.FC<DenahRuangCetakProps> = ({
             0
           );
 
-          // Regular paired desks cover seats 1..22 (11 desks), while seat >= 23 / desk >= 12 is separated cleanly as TEMPAT DUDUK TAMBAHAN
-          const regularMaxSeat = Math.min(22, Math.max(0, ...Array.from(studentBySeat.keys()).filter((k) => k <= 22)));
+          // 24 seats (12 paired desks) render in the 6-column paired grid; 23 students keep #23 in TEMPAT DUDUK TAMBAHAN
+          const is24PairedMode = roomStudents.length === 24 || studentBySeat.has(24);
+          const regularMaxAllowed = is24PairedMode ? 24 : 22;
+          const regularMaxSeat = Math.min(
+            regularMaxAllowed,
+            Math.max(0, ...Array.from(studentBySeat.keys()).filter((k) => k <= regularMaxAllowed))
+          );
           const numRows = Math.max(1, Math.ceil(regularMaxSeat / 6));
           const seatRows: Array<Array<{ seatNo: number; student: Student | null; isSoloPartnerEmpty: boolean }>> = [];
           for (let r = 0; r < numRows; r++) {
             const rowSeats: Array<{ seatNo: number; student: Student | null; isSoloPartnerEmpty: boolean }> = [];
             for (let c = 0; c < 6; c++) {
               const targetSeatNo = r * 6 + c + 1;
-              if (targetSeatNo > 22) {
+              if (targetSeatNo > regularMaxAllowed) {
                 rowSeats.push({ seatNo: targetSeatNo, student: null, isSoloPartnerEmpty: false });
                 continue;
               }
@@ -155,9 +163,9 @@ export const DenahRuangCetak: React.FC<DenahRuangCetakProps> = ({
             seatRows.push(rowSeats);
           }
 
-          // Check extra seats (#23 and above) for TEMPAT DUDUK TAMBAHAN section
+          // Check extra seats (#23 in 23-student mode, or #25+) for TEMPAT DUDUK TAMBAHAN section
           const extraSeats = Array.from(studentBySeat.entries())
-            .filter(([seatNo]) => seatNo >= 23)
+            .filter(([seatNo]) => seatNo > regularMaxAllowed)
             .sort((a, b) => a[0] - b[0]);
 
           const rowGapClass =

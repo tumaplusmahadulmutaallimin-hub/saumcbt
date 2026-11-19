@@ -370,6 +370,7 @@ export const localFallbackApi = {
     students: Student[];
     rooms: ExamRoom[];
     roomConfig: RoomDistributionConfig;
+    jumlahSesi?: number;
   }) => {
     const db = loadLocalDb();
     const user = requireLocalEdit(db, 'ruang_sesi');
@@ -383,7 +384,20 @@ export const localFallbackApi = {
           : payload.rooms.length,
     };
     db.examConfig.jumlahRuang = payload.rooms.length;
-    appendAudit(db, user, 'ruang_sesi', 'SAVE_ROOMS_SESSIONS', `Menyimpan pembagian ${payload.rooms.length} ruang ujian.`);
+    if (
+      typeof payload.jumlahSesi === 'number' &&
+      Number.isFinite(payload.jumlahSesi) &&
+      payload.jumlahSesi >= 1
+    ) {
+      db.examConfig.jumlahSesi = Math.max(1, Math.floor(payload.jumlahSesi));
+    }
+    appendAudit(
+      db,
+      user,
+      'ruang_sesi',
+      'SAVE_ROOMS_SESSIONS',
+      `Menyimpan pembagian ${payload.rooms.length} ruang ujian (${db.examConfig.jumlahSesi} sesi).`
+    );
     saveLocalDb(db);
     return {
       students: db.students,

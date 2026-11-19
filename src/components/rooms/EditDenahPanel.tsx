@@ -32,10 +32,12 @@ interface EditDenahPanelProps {
   examConfig: ExamConfig;
   canEdit: boolean;
   initialRoomId?: string;
+  initialSesi?: number;
   onSaveRooms: (payload: {
     students: Student[];
     rooms: ExamRoom[];
     roomConfig: RoomDistributionConfig;
+    jumlahSesi?: number;
   }) => Promise<void>;
 }
 
@@ -62,9 +64,19 @@ export const EditDenahPanel: React.FC<EditDenahPanelProps> = ({
   examConfig,
   canEdit,
   initialRoomId,
+  initialSesi,
   onSaveRooms,
 }) => {
   const isOnline = examConfig.moda === 'online';
+  const hasSessions =
+    isOnline ||
+    (examConfig.jumlahSesi || 1) > 1 ||
+    students.some((s) => s.status === 'Aktif' && (s.sesi || 1) > 1);
+  const totalSesiCount = Math.max(
+    1,
+    examConfig.jumlahSesi || 1,
+    ...students.filter((s) => s.status === 'Aktif').map((s) => s.sesi || 1)
+  );
   const regularRooms = useMemo(
     () => rooms.filter((r) => !r.id.startsWith('room-cadangan')),
     [rooms]
@@ -83,7 +95,9 @@ export const EditDenahPanel: React.FC<EditDenahPanelProps> = ({
       ? initialRoomId
       : regularRooms[0]?.id || ''
   );
-  const [selectedSesi, setSelectedSesi] = useState<number>(1);
+  const [selectedSesi, setSelectedSesi] = useState<number>(
+    initialSesi && initialSesi > 0 ? initialSesi : 1
+  );
   const [selectedSeatNo, setSelectedSeatNo] = useState<number | null>(null);
 
   // Swap desks state
@@ -114,6 +128,12 @@ export const EditDenahPanel: React.FC<EditDenahPanelProps> = ({
     }
   }, [initialRoomId, regularRooms]);
 
+  useEffect(() => {
+    if (initialSesi && initialSesi > 0) {
+      setSelectedSesi(initialSesi);
+    }
+  }, [initialSesi]);
+
   const currentRoom = draftRooms.find((r) => r.id === selectedRoomId) || draftRooms[0];
   const facilities = currentRoom ? getRoomFacilityTotals(currentRoom) : null;
 
@@ -124,10 +144,10 @@ export const EditDenahPanel: React.FC<EditDenahPanelProps> = ({
         (s) =>
           s.status === 'Aktif' &&
           s.ruangId === currentRoom.id &&
-          (!isOnline || (s.sesi || 1) === selectedSesi)
+          (!hasSessions || (s.sesi || 1) === selectedSesi)
       )
       .sort((a, b) => (a.nomorMeja || 999) - (b.nomorMeja || 999));
-  }, [draftStudents, currentRoom, isOnline, selectedSesi]);
+  }, [draftStudents, currentRoom, hasSessions, selectedSesi]);
 
   const seatMap = useMemo(() => {
     const map = new Map<number, Student>();
@@ -211,8 +231,8 @@ export const EditDenahPanel: React.FC<EditDenahPanelProps> = ({
       movingStudent.id,
       currentRoom.id,
       seatNo,
-      isOnline,
-      isOnline ? selectedSesi : undefined
+      hasSessions,
+      hasSessions ? selectedSesi : undefined
     );
 
     if (!res.ok) {
@@ -240,8 +260,8 @@ export const EditDenahPanel: React.FC<EditDenahPanelProps> = ({
       currentRoom.id,
       deskA,
       deskB,
-      isOnline,
-      isOnline ? selectedSesi : undefined
+      hasSessions,
+      hasSessions ? selectedSesi : undefined
     );
     setDraftStudents(updated);
     setSelectedSeatNo(null);
@@ -340,6 +360,7 @@ export const EditDenahPanel: React.FC<EditDenahPanelProps> = ({
         students: draftStudents,
         rooms: syncedRooms,
         roomConfig,
+        jumlahSesi: examConfig.jumlahSesi,
       });
       setUndoStack([]);
       setInfoMsg('Perubahan denah ruang berhasil disimpan ke database.');
@@ -358,16 +379,17 @@ export const EditDenahPanel: React.FC<EditDenahPanelProps> = ({
     );
   }
 
-  // Compute physical desk count shown (at least 11, or totalMeja, or highest occupied desk)
+  // Compute physical desk count shown (12 paired desks when 24 seats occupied, else 11 paired + extra desk 12 for solo #23)
   const highestOccupiedDesk = Math.max(
     ...roomOccupants.map((s) => (s.nomorMeja ? Math.ceil(s.nomorMeja / 2) : 0)),
     0
   );
   const totalDesksToRender = Math.max(11, facilities.totalMeja, highestOccupiedDesk);
-  const regularDeskSlots = Array.from({ length: Math.min(11, totalDesksToRender) }, (_, i) => i + 1);
+  const regularDeskCount = roomOccupants.length === 24 || seatMap.has(24) ? 12 : 11;
+  const regularDeskSlots = Array.from({ length: Math.min(regularDeskCount, totalDesksToRender) }, (_, i) => i + 1);
   const extraDeskSlots =
-    totalDesksToRender > 11
-      ? Array.from({ length: totalDesksToRender - 11 }, (_, i) => i + 12)
+    totalDesksToRender > regularDeskCount
+      ? Array.from({ length: totalDesksToRender - regularDeskCount }, (_, i) => i + regularDeskCount + 1)
       : [];
 
   const spacingGapClass =
@@ -487,7 +509,7 @@ export const EditDenahPanel: React.FC<EditDenahPanelProps> = ({
             </select>
           </div>
 
-          {isOnline && (
+          {hasSessions && (
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Pilih Sesi</label>
               <select
@@ -498,7 +520,7 @@ export const EditDenahPanel: React.FC<EditDenahPanelProps> = ({
                 }}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-semibold"
               >
-                {Array.from({ length: Math.max(1, examConfig.jumlahSesi) }, (_, i) => i + 1).map((s) => (
+                {Array.from({ length: totalSesiCount }, (_, i) => i + 1).map((s) => (
                   <option key={s} value={s}>
                     Sesi {s}
                   </option>

@@ -1,45 +1,51 @@
 {
   "profile": {
-    "namaMadrasah": "MA Al-Ikhlas Nusantara",
+    "namaMadrasah": "",
     "jenjang": "MA",
     "nsm": "",
     "npsn": "",
     "alamat": "",
     "desaKelurahan": "",
     "kecamatan": "",
-    "kabupatenKota": "Kab. Sleman",
-    "provinsi": "DI Yogyakarta",
+    "kabupatenKota": "",
+    "provinsi": "",
     "kodePos": "",
     "telepon": "",
     "email": "",
     "website": "",
-    "namaKepala": "Drs. H. Ahmad Fauzi",
+    "namaKepala": "",
     "nipKepala": "",
     "namaKetuaPanitia": "",
     "nipKetuaPanitia": "",
     "tahunPelajaran": "2025/2026",
     "semester": "Genap",
-    "jenisUjian": "Asesmen Madrasah 2026",
+    "jenisUjian": "Asesmen Madrasah",
     "tempatTandaTangan": "",
     "tanggalSurat": "",
     "kopWidthPercent": 100,
     "kopPosition": "center",
     "kopMarginTopMm": 0,
     "kopMarginBottomMm": 4,
-    "useOriginalKopImage": false
+    "useOriginalKopImage": false,
+    "kopBaris1": "KEMENTERIAN AGAMA REPUBLIK INDONESIA",
+    "kopBaris2": "",
+    "kopBaris3": "",
+    "showLogoKemenag": true,
+    "showLogoMadrasah": true,
+    "kopLogoSizePx": 64
   },
   "examConfig": {
     "id": "exam-aktif",
-    "namaUjian": "Asesmen Madrasah 2026",
+    "namaUjian": "",
     "tahunPelajaran": "2025/2026",
     "jenjangLabel": "",
     "registeredClasses": [],
     "tanggalMulai": "",
     "tanggalSelesai": "",
-    "jumlahHari": 3,
+    "jumlahHari": 0,
     "jumlahMapel": 0,
     "moda": "online",
-    "jumlahRuang": 2,
+    "jumlahRuang": 0,
     "jumlahSesi": 1,
     "jamPelaksanaan": "07:30 - 12:00 WIB",
     "seragamPerHariJenjang": {},
@@ -47,99 +53,7 @@
     "isNomorFinalized": false,
     "isDenahLokasiFinalized": false
   },
-  "students": [
-    {
-      "id": "st-1795048668493",
-      "nisn": "0091000001",
-      "nis": "2026001",
-      "nama": "Ahmad Zaki",
-      "tempatLahir": "",
-      "tanggalLahir": "",
-      "jenisKelamin": "L",
-      "kelas": "XII-A",
-      "nomorPeserta": "",
-      "status": "Aktif",
-      "jenjang": "XII"
-    },
-    {
-      "id": "st-1795048668759",
-      "nisn": "0091000002",
-      "nis": "2026002",
-      "nama": "Budi Santoso",
-      "tempatLahir": "",
-      "tanggalLahir": "",
-      "jenisKelamin": "L",
-      "kelas": "XII-A",
-      "nomorPeserta": "",
-      "status": "Aktif",
-      "jenjang": "XII"
-    },
-    {
-      "id": "st-1795048669043",
-      "nisn": "0091000003",
-      "nis": "2026003",
-      "nama": "Citra Lestari",
-      "tempatLahir": "",
-      "tanggalLahir": "",
-      "jenisKelamin": "P",
-      "kelas": "XII-A",
-      "nomorPeserta": "",
-      "status": "Aktif",
-      "jenjang": "XII"
-    },
-    {
-      "id": "st-1795048669325",
-      "nisn": "0091000004",
-      "nis": "2026004",
-      "nama": "Dewi Anggraini",
-      "tempatLahir": "",
-      "tanggalLahir": "",
-      "jenisKelamin": "P",
-      "kelas": "XII-B",
-      "nomorPeserta": "",
-      "status": "Aktif",
-      "jenjang": "XII"
-    },
-    {
-      "id": "st-1795048669592",
-      "nisn": "0091000005",
-      "nis": "2026005",
-      "nama": "Eko Prasetyo",
-      "tempatLahir": "",
-      "tanggalLahir": "",
-      "jenisKelamin": "L",
-      "kelas": "XII-B",
-      "nomorPeserta": "",
-      "status": "Aktif",
-      "jenjang": "XII"
-    },
-    {
-      "id": "st-1795048669892",
-      "nisn": "0091000006",
-      "nis": "2026006",
-      "nama": "Fatimah Azzahra",
-      "tempatLahir": "",
-      "tanggalLahir": "",
-      "jenisKelamin": "P",
-      "kelas": "XII-B",
-      "nomorPeserta": "",
-      "status": "Aktif",
-      "jenjang": "XII"
-    },
-    {
-      "id": "st-1795048670210",
-      "nisn": "0091000007",
-      "nis": "2026007",
-      "nama": "Galih Pratama",
-      "tempatLahir": "",
-      "tanggalLahir": "",
-      "jenisKelamin": "L",
-      "kelas": "XII-B",
-      "nomorPeserta": "",
-      "status": "Aktif",
-      "jenjang": "XII"
-    }
-  ],
+  "students": [],
   "rooms": [],
   "physicalClassrooms": [],
   "schedules": [],
@@ -349,7 +263,7 @@
       "paperSize": "A4",
       "marginMm": 10,
       "isFinalized": false,
-      "updatedAt": "2026-11-19T00:31:52.261Z"
+      "updatedAt": "2026-11-19T17:23:09.751Z"
     },
     {
       "id": "tatib-pengawas",
@@ -365,7 +279,7 @@
       "paperSize": "A4",
       "marginMm": 10,
       "isFinalized": false,
-      "updatedAt": "2026-11-19T00:31:52.261Z"
+      "updatedAt": "2026-11-19T17:23:09.751Z"
     }
   ],
   "phoneRecords": [],
@@ -423,98 +337,8 @@
   ],
   "auditLogs": [
     {
-      "id": "log-1795048670383-y8t1",
-      "timestamp": "2026-11-19T00:37:50.383Z",
-      "actor": "Arif Syaifudin, S.H",
-      "role": "Super Admin",
-      "module": "dnpu",
-      "action": "UPDATE_STUDENTS",
-      "detail": "Memperbarui 7 data peserta."
-    },
-    {
-      "id": "log-1795048670080-8vj8",
-      "timestamp": "2026-11-19T00:37:50.080Z",
-      "actor": "Arif Syaifudin, S.H",
-      "role": "Super Admin",
-      "module": "dnpu",
-      "action": "UPDATE_STUDENTS",
-      "detail": "Memperbarui 6 data peserta."
-    },
-    {
-      "id": "log-1795048669762-qp63",
-      "timestamp": "2026-11-19T00:37:49.762Z",
-      "actor": "Arif Syaifudin, S.H",
-      "role": "Super Admin",
-      "module": "dnpu",
-      "action": "UPDATE_STUDENTS",
-      "detail": "Memperbarui 5 data peserta."
-    },
-    {
-      "id": "log-1795048669464-jdpk",
-      "timestamp": "2026-11-19T00:37:49.464Z",
-      "actor": "Arif Syaifudin, S.H",
-      "role": "Super Admin",
-      "module": "dnpu",
-      "action": "UPDATE_STUDENTS",
-      "detail": "Memperbarui 4 data peserta."
-    },
-    {
-      "id": "log-1795048669198-0yzd",
-      "timestamp": "2026-11-19T00:37:49.198Z",
-      "actor": "Arif Syaifudin, S.H",
-      "role": "Super Admin",
-      "module": "dnpu",
-      "action": "UPDATE_STUDENTS",
-      "detail": "Memperbarui 3 data peserta."
-    },
-    {
-      "id": "log-1795048668912-kkto",
-      "timestamp": "2026-11-19T00:37:48.912Z",
-      "actor": "Arif Syaifudin, S.H",
-      "role": "Super Admin",
-      "module": "dnpu",
-      "action": "UPDATE_STUDENTS",
-      "detail": "Memperbarui 2 data peserta."
-    },
-    {
-      "id": "log-1795048668633-spo9",
-      "timestamp": "2026-11-19T00:37:48.633Z",
-      "actor": "Arif Syaifudin, S.H",
-      "role": "Super Admin",
-      "module": "dnpu",
-      "action": "UPDATE_STUDENTS",
-      "detail": "Memperbarui 1 data peserta."
-    },
-    {
-      "id": "log-1795048668343-hrab",
-      "timestamp": "2026-11-19T00:37:48.343Z",
-      "actor": "Arif Syaifudin, S.H",
-      "role": "Super Admin",
-      "module": "pengaturan",
-      "action": "UPDATE_SETTINGS",
-      "detail": "Memperbarui pengaturan madrasah / kertas / panitia."
-    },
-    {
-      "id": "log-1795048668330-06q1",
-      "timestamp": "2026-11-19T00:37:48.330Z",
-      "actor": "Arif Syaifudin, S.H",
-      "role": "Super Admin",
-      "module": "pengaturan_ujian",
-      "action": "UPDATE_CONFIG",
-      "detail": "Moda: online, Ruang: 2, Sesi: 1"
-    },
-    {
-      "id": "log-1795048668098-04cj",
-      "timestamp": "2026-11-19T00:37:48.098Z",
-      "actor": "Arif Syaifudin, S.H",
-      "role": "Super Admin",
-      "module": "pengaturan",
-      "action": "UPDATE_SETTINGS",
-      "detail": "Memperbarui pengaturan madrasah / kertas / panitia."
-    },
-    {
-      "id": "log-1795048664216-25yx",
-      "timestamp": "2026-11-19T00:37:44.216Z",
+      "id": "log-1795111830851-et7e",
+      "timestamp": "2026-11-19T18:10:30.851Z",
       "actor": "Arif Syaifudin, S.H",
       "role": "Super Admin",
       "module": "auth",
@@ -522,8 +346,17 @@
       "detail": "Login sebagai Arif Syaifudin, S.H (Super Admin)"
     },
     {
+      "id": "log-1795109049854-vyu0",
+      "timestamp": "2026-11-19T17:24:09.854Z",
+      "actor": "Arif Syaifudin, S.H",
+      "role": "Super Admin",
+      "module": "pengaturan",
+      "action": "RESET_CLEAN_DATA",
+      "detail": "Mereset seluruh data ujian ke kondisi bersih tanpa data dummy."
+    },
+    {
       "id": "log-init",
-      "timestamp": "2026-11-19T00:37:44.215Z",
+      "timestamp": "2026-11-19T17:24:09.854Z",
       "actor": "Arif Syaifudin, S.H",
       "role": "Super Admin",
       "module": "system",

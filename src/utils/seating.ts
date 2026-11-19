@@ -476,12 +476,136 @@ export interface RoomDistributionResult {
   }>;
 }
 
+export interface GenerateFeasibilityResult {
+  isFeasible: boolean;
+  totalActiveStudents: number;
+  jumlahRuang: number;
+  jumlahSesi: number;
+  kapasitasIdealPerRuang: number;
+  kapasitasMaksPerRuang: number;
+  totalKapasitasIdeal: number;
+  totalKapasitasMaks: number;
+  totalMejaTersedia: number;
+  unaccommodatedCount: number;
+  jenjangCounts: Record<string, number>;
+  recommendedMinSesi: number;
+  recommendedMinRuang: number;
+  reasons: string[];
+  recommendations: string[];
+}
+
+/**
+ * VALIDATION-FIRST Feasibility Check (Section 1, 2, 3, 9, 10):
+ * Computes total capacity = jumlahRuang × jumlahSesi × 24,
+ * cross-jenjang desk feasibility (maxSingleJenjang <= jumlahRuang × jumlahSesi × 12),
+ * and rejects BEFORE generating any temporary placement when infeasible.
+ */
+export function validateGenerateFeasibility(
+  students: Student[],
+  rooms: ExamRoom[],
+  jumlahRuangInput: number,
+  jumlahSesiInput: number
+): GenerateFeasibilityResult {
+  const activeStudents = students.filter((s) => s.status === 'Aktif');
+  const totalActiveStudents = activeStudents.length;
+  const jumlahRuang = Math.max(1, Math.floor(jumlahRuangInput || rooms.filter((r) => !r.id.startsWith('room-cadangan')).length || 1));
+  const jumlahSesi = Math.max(1, Math.floor(jumlahSesiInput || 1));
+
+  const kapasitasIdealPerRuang = 22;
+  const kapasitasMaksPerRuang = 24;
+  const totalKapasitasIdeal = jumlahRuang * jumlahSesi * kapasitasIdealPerRuang;
+  const totalKapasitasMaks = jumlahRuang * jumlahSesi * kapasitasMaksPerRuang;
+  const totalMejaTersedia = jumlahRuang * jumlahSesi * 12;
+  const unaccommodatedCount = Math.max(0, totalActiveStudents - totalKapasitasMaks);
+
+  const jenjangCounts: Record<string, number> = {};
+  for (const s of activeStudents) {
+    const jen = s.jenjang || extractJenjang(s.kelas);
+    jenjangCounts[jen] = (jenjangCounts[jen] || 0) + 1;
+  }
+
+  const distinctJenjangs = Object.keys(jenjangCounts);
+  let maxJenjangKey = '';
+  let maxSingleJenjangCount = 0;
+  for (const [k, count] of Object.entries(jenjangCounts)) {
+    if (count > maxSingleJenjangCount) {
+      maxSingleJenjangCount = count;
+      maxJenjangKey = k;
+    }
+  }
+  const nonDominantTotal = totalActiveStudents - maxSingleJenjangCount;
+
+  const minSlotsByCap = Math.max(1, Math.ceil(totalActiveStudents / 24));
+  const minSlotsByJenjang = Math.max(1, Math.ceil(maxSingleJenjangCount / 12));
+  const requiredRoomSessionSlots = Math.max(minSlotsByCap, minSlotsByJenjang);
+
+  const recommendedMinSesi = Math.max(1, Math.ceil(requiredRoomSessionSlots / jumlahRuang));
+  const recommendedMinRuang = Math.max(1, Math.ceil(requiredRoomSessionSlots / jumlahSesi));
+
+  const reasons: string[] = [];
+  const recommendations: string[] = [];
+
+  if (totalActiveStudents === 0) {
+    reasons.push('Belum ada peserta berstatus Aktif di DNPU untuk dialokasikan ke ruang ujian.');
+    recommendations.push('Tambahkan atau impor peserta aktif di menu Data DNPU terlebih dahulu.');
+  } else {
+    if (totalActiveStudents > totalKapasitasMaks) {
+      reasons.push(
+        `Kapasitas tidak mencukupi: Total peserta aktif ${totalActiveStudents} siswa melebihi kapasitas maksimal ${jumlahRuang} ruang × ${jumlahSesi} sesi × 24 siswa = ${totalKapasitasMaks} kursi (${unaccommodatedCount} siswa belum tertampung).`
+      );
+      recommendations.push(
+        `Sesuaikan jumlah sesi minimal menjadi ${recommendedMinSesi} sesi (kapasitas ${jumlahRuang * recommendedMinSesi * 24} kursi), ATAU tambah jumlah ruang minimal menjadi ${recommendedMinRuang} ruang (kapasitas ${recommendedMinRuang * jumlahSesi * 24} kursi).`
+      );
+    }
+
+    if (distinctJenjangs.length < 2 && totalActiveStudents >= 2) {
+      reasons.push(
+        `Komposisi jenjang tidak memenuhi syarat pasangan lintas jenjang: Hanya ditemukan 1 jenjang (${distinctJenjangs[0] || '-'}). Setiap meja berpasangan wajib berisi 2 siswa dari jenjang berbeda.`
+      );
+      recommendations.push('Pastikan peserta berasal dari minimal 2 jenjang kelas berbeda di Data DNPU.');
+    } else if (maxSingleJenjangCount > totalMejaTersedia) {
+      reasons.push(
+        `Ketidakseimbangan jenjang melampaui batas meja lintas jenjang: Jenjang ${maxJenjangKey} berjumlah ${maxSingleJenjangCount} siswa, sedangkan maksimal meja tersedia adalah ${jumlahRuang} ruang × ${jumlahSesi} sesi × 12 meja = ${totalMejaTersedia} meja (kelebihan ${maxSingleJenjangCount - totalMejaTersedia} siswa jenjang ${maxJenjangKey} tidak dapat dipasangkan tanpa melanggar aturan meja).`
+      );
+      recommendations.push(
+        `Sesuaikan menjadi ${recommendedMinSesi} sesi atau ${recommendedMinRuang} ruang agar tersedia minimal ${maxSingleJenjangCount} meja.`
+      );
+    } else {
+      // Check if every non-empty room-session can receive at least 1 cross-jenjang partner
+      const activeSlots = Math.min(jumlahRuang * jumlahSesi, totalActiveStudents);
+      if (distinctJenjangs.length >= 2 && totalActiveStudents > activeSlots && nonDominantTotal < Math.min(activeSlots, totalActiveStudents - totalMejaTersedia)) {
+        reasons.push(
+          `Komposisi jenjang (${Object.entries(jenjangCounts).map(([k, v]) => `${k}: ${v}`).join(', ')}) belum mencukupi untuk membentuk pasangan lintas jenjang di seluruh ${activeSlots} ruang-sesi.`
+        );
+      }
+    }
+  }
+
+  return {
+    isFeasible: reasons.length === 0,
+    totalActiveStudents,
+    jumlahRuang,
+    jumlahSesi,
+    kapasitasIdealPerRuang,
+    kapasitasMaksPerRuang,
+    totalKapasitasIdeal,
+    totalKapasitasMaks,
+    totalMejaTersedia,
+    unaccommodatedCount,
+    jenjangCounts,
+    recommendedMinSesi,
+    recommendedMinRuang,
+    reasons,
+    recommendations,
+  };
+}
+
 /**
  * Upgraded Room Distribution supporting:
  * - Honors explicit room count (config.jumlahRuangManual or examJumlahRuang) strictly
  * - 2-jenjang cross composition prioritized in lower rooms, 3-jenjang placed at the END
  * - Zero same-jenjang desk mate collisions wherever mathematically possible
- * - Session-aware allocation when moda === 'online'
+ * - Session-aware allocation whenever moda === 'online' OR jumlahSesi > 1
  */
 export function distributeRoomsCrossJenjang(
   students: Student[],
@@ -489,17 +613,43 @@ export function distributeRoomsCrossJenjang(
   config: RoomDistributionConfig,
   moda: ModaUjian = 'kertas',
   rng: () => number = Math.random,
-  options?: { examJumlahRuang?: number }
+  options?: { examJumlahRuang?: number; jumlahSesi?: number; autoAssignSessions?: boolean }
 ): RoomDistributionResult {
   // Support up to 24 seats (12 meja × 2 kursi) cleanly
-  const maxCap = Math.min(24, Math.max(1, config.kapasitasPerRuang || 22));
-  const activeStudents = students.filter((s) => s.status === 'Aktif');
+  const requestedCap = Math.min(24, Math.max(1, config.kapasitasPerRuang || 22));
+  const explicitSesiCount = options?.jumlahSesi && options.jumlahSesi > 0 ? Math.floor(options.jumlahSesi) : 0;
+  const hasMultiSessionStudents = students.some((s) => s.status === 'Aktif' && (s.sesi || 1) > 1);
+  const useSessions = moda === 'online' || explicitSesiCount > 1 || hasMultiSessionStudents;
+  const totalSesiCount = useSessions
+    ? Math.max(
+        explicitSesiCount || 1,
+        ...students.filter((s) => s.status === 'Aktif').map((s) => s.sesi || 1)
+      )
+    : 1;
+
+  // Stratify into balanced sessions if autoAssignSessions requested or multi-session students lack balanced assignment
+  let workingStudents = students;
+  if (useSessions && totalSesiCount >= 1) {
+    const currentlyInMultiple = new Set(
+      students.filter((s) => s.status === 'Aktif' && s.sesi).map((s) => s.sesi as number)
+    ).size;
+    if (options?.autoAssignSessions || (totalSesiCount > 1 && currentlyInMultiple < totalSesiCount)) {
+      workingStudents = distributeSessions(students, totalSesiCount, rng);
+    } else if (totalSesiCount === 1) {
+      workingStudents = students.map((s) => (s.status === 'Aktif' ? { ...s, sesi: s.sesi || 1 } : s));
+    }
+  }
+
+  const activeStudents = workingStudents.filter((s) => s.status === 'Aktif');
   const warnings: string[] = [];
 
   const sessionBuckets = new Map<number, Student[]>();
-  if (moda === 'online') {
+  if (useSessions) {
+    for (let sIdx = 1; sIdx <= totalSesiCount; sIdx++) {
+      sessionBuckets.set(sIdx, []);
+    }
     for (const s of activeStudents) {
-      const sesi = s.sesi || 1;
+      const sesi = Math.min(totalSesiCount, Math.max(1, s.sesi || 1));
       if (!sessionBuckets.has(sesi)) sessionBuckets.set(sesi, []);
       sessionBuckets.get(sesi)!.push(s);
     }
@@ -517,8 +667,15 @@ export function distributeRoomsCrossJenjang(
     options?.examJumlahRuang && options.examJumlahRuang > 0 ? options.examJumlahRuang : 0;
   const neededRooms = Math.max(
     1,
-    explicitManual || fallbackExamRooms || calculateRequiredRooms(maxBucketSize, maxCap)
+    explicitManual || fallbackExamRooms || calculateRequiredRooms(maxBucketSize, requestedCap)
   );
+
+  // If active bucket needs 23-24 seats/room within fixed rooms and requestedCap was ideal 22, allow up to 24 normal max
+  const minNeededPerRoom = Math.ceil(maxBucketSize / neededRooms);
+  const maxCap =
+    minNeededPerRoom > requestedCap && minNeededPerRoom <= 24
+      ? Math.min(24, minNeededPerRoom)
+      : requestedCap;
 
   // Exclude reserve rooms when regenerating standard numbered rooms 01..N
   const normalExisting = existingRooms.filter((r) => !r.id.startsWith('room-cadangan'));
@@ -527,11 +684,11 @@ export function distributeRoomsCrossJenjang(
     const existing = normalExisting[i];
     const roomNumStr = String(i + 1).padStart(2, '0');
     if (existing) {
-      const mejaAwal = existing.mejaAwal ?? Math.ceil(Math.min(22, maxCap) / 2);
-      const kursiAwal = existing.kursiAwal ?? Math.min(22, maxCap);
+      const mejaAwal = existing.mejaAwal ?? Math.ceil((existing.kapasitas || maxCap) / 2);
+      const kursiAwal = existing.kursiAwal ?? (existing.kapasitas || maxCap);
       const mejaTambahan = existing.mejaTambahan ?? 0;
       const kursiTambahan = existing.kursiTambahan ?? 0;
-      const totalKursi = kursiTambahan > 0 ? kursiAwal + kursiTambahan : maxCap;
+      const totalKursi = kursiAwal + kursiTambahan;
       rooms.push({
         ...existing,
         nomorRuang: roomNumStr,
@@ -544,14 +701,17 @@ export function distributeRoomsCrossJenjang(
         kursiAwal,
         mejaTambahan,
         kursiTambahan,
-        statusFasilitas: mejaTambahan > 0 || kursiTambahan > 0 ? 'INSIDENTAL' : (existing.statusFasilitas || 'NORMAL'),
+        statusFasilitas:
+          mejaTambahan > 0 || kursiTambahan > 0
+            ? 'INSIDENTAL'
+            : existing.statusFasilitas || 'NORMAL',
         jarakAntarMeja: existing.jarakAntarMeja || 'standar',
         jumlahKolom: 6,
         jumlahBaris: Math.ceil(totalKursi / 6),
         incidentalSeatNo: undefined,
       });
     } else {
-      const mejaAwal = Math.ceil(Math.min(22, maxCap) / 2);
+      const mejaAwal = Math.ceil(maxCap / 2);
       const kursiAwal = maxCap;
       rooms.push({
         id: `room-${i + 1}`,
@@ -592,7 +752,7 @@ export function distributeRoomsCrossJenjang(
 
     const targetSizes = computeBalancedTargetSizes(
       pool.length,
-      rooms.map((r) => r.kapasitas)
+      rooms.map((r) => Math.max(r.kapasitas, maxCap))
     );
 
     let roomAllocations: Student[][];
@@ -701,7 +861,7 @@ export function distributeRoomsCrossJenjang(
     });
   }
 
-  const updatedStudents = students.map((st) => {
+  const updatedStudents = workingStudents.map((st) => {
     if (st.status !== 'Aktif') {
       return { ...st, ruangId: undefined, nomorMeja: undefined };
     }
@@ -832,9 +992,11 @@ export function validateRoomDistribution(
   jumlahSesi: number = 1
 ): RoomDistributionValidationResult {
   const activeStudents = students.filter((s) => s.status === 'Aktif');
-  const isOnline = moda === 'online';
-  const sessionList = isOnline
-    ? Array.from({ length: Math.max(1, jumlahSesi) }, (_, i) => i + 1)
+  const maxStudentSesi = Math.max(1, ...activeStudents.map((s) => s.sesi || 1));
+  const useSessions = moda === 'online' || jumlahSesi > 1 || maxStudentSesi > 1;
+  const effectiveSessions = Math.max(1, jumlahSesi, maxStudentSesi);
+  const sessionList = useSessions
+    ? Array.from({ length: effectiveSessions }, (_, i) => i + 1)
     : [undefined];
 
   const roomIdsSet = new Set(rooms.map((r) => r.id));
@@ -853,7 +1015,7 @@ export function validateRoomDistribution(
 
   const roomMetrics: RoomValidationMetric[] = [];
   const sameJenjangMsgs: string[] = [];
-  const over23Msgs: string[] = [];
+  const over24Msgs: string[] = [];
   const facilityShortageMsgs: string[] = [];
   const facilityShortageRoomIds = new Set<string>();
   const incidental23ViolationMsgs: string[] = [];
@@ -868,7 +1030,7 @@ export function validateRoomDistribution(
     const facilities = getRoomFacilityTotals(room);
     for (const sesiVal of sessionList) {
       const occupants = activeStudents.filter(
-        (s) => s.ruangId === room.id && (!isOnline || (s.sesi || 1) === sesiVal)
+        (s) => s.ruangId === room.id && (!useSessions || (s.sesi || 1) === sesiVal)
       );
       if (occupants.length === 0) continue;
 
@@ -928,9 +1090,9 @@ export function validateRoomDistribution(
       const maxDeskUsed = Math.max(byDesk.size, ...Array.from(byDesk.keys()), 0);
       const desksUsed = Math.max(byDesk.size, maxDeskUsed);
 
-      if (occupants.length > 23) {
-        over23Msgs.push(
-          `${room.namaRuang}${sesiTag}: Terisi ${occupants.length} siswa, melebihi batas insidental maksimal 23 siswa per ruang.`
+      if (occupants.length > 24) {
+        over24Msgs.push(
+          `${room.namaRuang}${sesiTag}: Terisi ${occupants.length} siswa, melebihi kapasitas maksimal normal 24 siswa (12 meja berpasangan) per ruang.`
         );
       }
 
@@ -980,7 +1142,7 @@ export function validateRoomDistribution(
       severity: 'error',
       detail:
         reserveRooms.length === 0
-          ? 'Seluruh alokasi menggunakan ruang ujian reguler yang tersedia.'
+          ? 'Seluruh alokasi menggunakan ruang ujian reguler yang ditetapkan madrasah.'
           : `Ditemukan ruang cadangan (${reserveRooms.map((r) => r.namaRuang).join(', ')}). Hapus ruang cadangan sesuai ketentuan.`,
     },
     {
@@ -995,12 +1157,12 @@ export function validateRoomDistribution(
     },
     {
       code: 'no_duplicate_students',
-      label: 'Tidak ada siswa terduplikasi',
+      label: 'Tidak ada siswa terduplikasi antar ruang/sesi',
       passed: duplicateIds.length === 0,
       severity: 'error',
       detail:
         duplicateIds.length === 0
-          ? 'Setiap siswa hanya menempati tepat 1 kursi.'
+          ? 'Setiap siswa hanya menempati tepat 1 sesi, 1 ruang, dan 1 kursi.'
           : `Ditemukan duplikasi data siswa: ${duplicateIds.join(', ')}.`,
     },
     {
@@ -1015,13 +1177,13 @@ export function validateRoomDistribution(
     },
     {
       code: 'incidental_capacity',
-      label: 'Kapasitas ideal ≤ 22 siswa / insidental maks 23 siswa',
-      passed: over23Msgs.length === 0,
+      label: 'Kapasitas ideal ≤ 22 / insidental 23 / normal maks 24 siswa',
+      passed: over24Msgs.length === 0,
       severity: 'error',
       detail:
-        over23Msgs.length === 0
-          ? 'Semua ruang berada dalam batas kapasitas ideal (22) atau insidental (23).'
-          : over23Msgs.join(' | '),
+        over24Msgs.length === 0
+          ? 'Semua ruang berada dalam batas kapasitas ≤ 24 siswa (12 meja).'
+          : over24Msgs.join(' | '),
     },
     {
       code: 'incidental_23_solo_seat',
@@ -1031,8 +1193,8 @@ export function validateRoomDistribution(
       detail:
         incidental23ViolationMsgs.length === 0
           ? roomMetrics.some((m) => m.studentCount === 23)
-            ? 'Ruang berkapasitas insidental 23 telah menempatkan siswa ke-23 di meja tambahan secara mandiri.'
-            : 'Tidak ada ruang insidental 23 atau seluruh meja tambahan valid.'
+            ? 'Ruang 23 siswa telah menempatkan siswa ke-23 di meja tambahan secara mandiri.'
+            : 'Susunan meja 22 berpasangan / 24 berpasangan memenuhi ketentuan.'
           : incidental23ViolationMsgs.join(' | '),
     },
     {
@@ -1058,7 +1220,7 @@ export function validateRoomDistribution(
     },
     {
       code: 'multi_jenjang_rooms',
-      label: 'Komposisi dua jenjang berbeda tiap ruang',
+      label: 'Komposisi minimal dua jenjang berbeda tiap ruang',
       passed: singleJenjangMsgs.length === 0,
       severity: 'warning',
       detail:
@@ -1090,7 +1252,7 @@ export function previewRoomDistribution(
   moda: ModaUjian = 'kertas',
   jumlahSesi: number = 1,
   rng: () => number = Math.random,
-  options?: { examJumlahRuang?: number }
+  options?: { examJumlahRuang?: number; autoAssignSessions?: boolean }
 ): {
   distribution: RoomDistributionResult;
   validation: RoomDistributionValidationResult;
@@ -1103,7 +1265,10 @@ export function previewRoomDistribution(
     config,
     moda,
     rng,
-    options
+    {
+      ...options,
+      jumlahSesi,
+    }
   );
   const validation = validateRoomDistribution(
     distribution.updatedStudents,
@@ -1112,6 +1277,69 @@ export function previewRoomDistribution(
     jumlahSesi
   );
   return { distribution, validation };
+}
+
+/**
+ * STRICT VALIDATION-FIRST Generator (Section 3, 4, 5, 9, 10):
+ * Checks feasibility BEFORE generating. Rejects immediately without creating partial/fake allocation if infeasible!
+ */
+export function generateValidatedRoomPlan(
+  students: Student[],
+  existingRooms: ExamRoom[],
+  config: RoomDistributionConfig,
+  moda: ModaUjian = 'kertas',
+  jumlahRuang: number,
+  jumlahSesi: number,
+  rng: () => number = Math.random
+):
+  | {
+      accepted: false;
+      feasibility: GenerateFeasibilityResult;
+      distribution: null;
+      validation: null;
+    }
+  | {
+      accepted: true;
+      feasibility: GenerateFeasibilityResult;
+      distribution: RoomDistributionResult;
+      validation: RoomDistributionValidationResult;
+    } {
+  const feasibility = validateGenerateFeasibility(students, existingRooms, jumlahRuang, jumlahSesi);
+  if (!feasibility.isFeasible) {
+    return {
+      accepted: false,
+      feasibility,
+      distribution: null,
+      validation: null,
+    };
+  }
+
+  const effectiveCfg: RoomDistributionConfig = {
+    ...config,
+    jumlahRuangManual: feasibility.jumlahRuang,
+    kapasitasPerRuang: Math.min(24, Math.max(1, config.kapasitasPerRuang || 22)),
+    allowIncidental23: true,
+  };
+
+  const { distribution, validation } = previewRoomDistribution(
+    students,
+    existingRooms,
+    effectiveCfg,
+    moda,
+    feasibility.jumlahSesi,
+    rng,
+    {
+      examJumlahRuang: feasibility.jumlahRuang,
+      autoAssignSessions: true,
+    }
+  );
+
+  return {
+    accepted: true,
+    feasibility,
+    distribution,
+    validation,
+  };
 }
 
 /**
@@ -1134,10 +1362,10 @@ export function validateManualSeatMove(
     };
   }
   if (!swappedWithStudent) {
-    if (roomStudents.length + 1 > 23) {
+    if (roomStudents.length + 1 > 24) {
       return {
         ok: false,
-        error: `${targetRoom.namaRuang} sudah mencapai kapasitas insidental maksimal 23 siswa.`,
+        error: `${targetRoom.namaRuang} sudah mencapai kapasitas maksimal 24 siswa (12 meja berpasangan).`,
       };
     }
     if (roomStudents.length + 1 > facilities.totalKursi || targetDeskNo > facilities.totalMeja) {

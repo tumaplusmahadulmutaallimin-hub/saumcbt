@@ -518,10 +518,11 @@ async function startServer() {
   });
 
   app.post('/api/rooms/save', requireAuth, requireModuleEdit('ruang_sesi'), (req: AuthedRequest, res) => {
-    const { students, rooms, roomConfig } = req.body as {
+    const { students, rooms, roomConfig, jumlahSesi } = req.body as {
       students: Student[];
       rooms: ExamRoom[];
       roomConfig: RoomDistributionConfig;
+      jumlahSesi?: number;
     };
     if (!Array.isArray(students) || !Array.isArray(rooms)) {
       res.status(400).json({ error: 'Payload students dan rooms harus berupa array.' });
@@ -539,12 +540,15 @@ async function startServer() {
           : rooms.length,
     };
     db.examConfig.jumlahRuang = rooms.length;
+    if (typeof jumlahSesi === 'number' && Number.isFinite(jumlahSesi) && jumlahSesi >= 1) {
+      db.examConfig.jumlahSesi = Math.max(1, Math.floor(jumlahSesi));
+    }
     appendAudit(
       db,
       req.currentUser!,
       'ruang_sesi',
       'SAVE_ROOMS_SESSIONS',
-      `Menyimpan pembagian ${rooms.length} ruang ujian.`
+      `Menyimpan pembagian ${rooms.length} ruang ujian (${db.examConfig.jumlahSesi} sesi).`
     );
     saveDb(db);
     res.json({

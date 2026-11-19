@@ -50,7 +50,11 @@ import {
   validateExamCredentials,
   validateParticipantNumbers,
 } from '../../utils/numbering';
-import { distributeRoomsCrossJenjang, distributeSessions } from '../../utils/seating';
+import {
+  distributeRoomsCrossJenjang,
+  distributeSessions,
+  validateGenerateFeasibility,
+} from '../../utils/seating';
 
 interface DnpuViewProps {
   students: Student[];
@@ -71,6 +75,7 @@ interface DnpuViewProps {
     students: Student[];
     rooms: ExamRoom[];
     roomConfig: RoomDistributionConfig;
+    jumlahSesi?: number;
   }) => Promise<void>;
   onToggleFinalize: (finalized: boolean) => Promise<void>;
   onNavigate?: (tab: string) => void;
@@ -384,6 +389,7 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
         students: updated,
         rooms,
         roomConfig: localRoomConfig,
+        jumlahSesi: examConfig.jumlahSesi,
       });
       setStatusBanner(
         `Peserta aktif berhasil dibagi merata ke ${examConfig.jumlahSesi} sesi ujian.`
@@ -408,10 +414,27 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
       );
       return;
     }
+
+    const targetRuang =
+      localRoomConfig.jumlahRuangManual && localRoomConfig.jumlahRuangManual > 0
+        ? localRoomConfig.jumlahRuangManual
+        : examConfig.jumlahRuang || Math.max(1, rooms.filter((r) => !r.id.startsWith('room-cadangan')).length);
+    const targetSesi = Math.max(1, examConfig.jumlahSesi || 1);
+    const feasibility = validateGenerateFeasibility(students, rooms, targetRuang, targetSesi);
+    if (!feasibility.isFeasible) {
+      setErrorBanner(
+        `TOLAK GENERATE: ${feasibility.reasons.join(' ')} ${
+          feasibility.recommendations[0] ? `Rekomendasi: ${feasibility.recommendations[0]}` : ''
+        }`
+      );
+      return;
+    }
+
     setMasterBusy('ruang');
     try {
       const cleanConfig: RoomDistributionConfig = {
         ...localRoomConfig,
+        jumlahRuangManual: feasibility.jumlahRuang,
         kapasitasPerRuang: Math.min(24, Math.max(1, localRoomConfig.kapasitasPerRuang || 22)),
       };
       const res = distributeRoomsCrossJenjang(
@@ -420,15 +443,20 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
         cleanConfig,
         examConfig.moda,
         Math.random,
-        { examJumlahRuang: examConfig.jumlahRuang }
+        {
+          examJumlahRuang: feasibility.jumlahRuang,
+          jumlahSesi: feasibility.jumlahSesi,
+          autoAssignSessions: true,
+        }
       );
       await onSaveRooms({
         students: res.updatedStudents,
         rooms: res.updatedRooms,
         roomConfig: { ...cleanConfig, jumlahRuangManual: res.updatedRooms.length },
+        jumlahSesi: feasibility.jumlahSesi,
       });
       setStatusBanner(
-        `Pembagian ${res.updatedRooms.length} ruang & nomor kursi berhasil digenerate untuk ${activeStudentsCount} peserta.${
+        `Pembagian ${res.updatedRooms.length} ruang (${feasibility.jumlahSesi} sesi) & nomor kursi berhasil digenerate untuk ${activeStudentsCount} peserta.${
           res.warnings.length > 0 ? ` (${res.warnings[0]})` : ''
         }`
       );
@@ -452,15 +480,32 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
       );
       return;
     }
+
+    const targetRuang =
+      localRoomConfig.jumlahRuangManual && localRoomConfig.jumlahRuangManual > 0
+        ? localRoomConfig.jumlahRuangManual
+        : examConfig.jumlahRuang || Math.max(1, rooms.filter((r) => !r.id.startsWith('room-cadangan')).length);
+    const targetSesi = Math.max(1, examConfig.jumlahSesi || 1);
+    const feasibility = validateGenerateFeasibility(students, rooms, targetRuang, targetSesi);
+    if (!feasibility.isFeasible) {
+      setErrorBanner(
+        `TOLAK GENERATE: ${feasibility.reasons.join(' ')} ${
+          feasibility.recommendations[0] ? `Rekomendasi: ${feasibility.recommendations[0]}` : ''
+        }`
+      );
+      return;
+    }
+
     setMasterBusy('all');
     try {
       const stepNomor = generateStudentNumbers(students, localNumbering);
       const stepSesi =
-        examConfig.moda === 'online'
-          ? distributeSessions(stepNomor, examConfig.jumlahSesi)
+        examConfig.moda === 'online' || feasibility.jumlahSesi > 1
+          ? distributeSessions(stepNomor, feasibility.jumlahSesi)
           : stepNomor;
       const cleanRoomCfg: RoomDistributionConfig = {
         ...localRoomConfig,
+        jumlahRuangManual: feasibility.jumlahRuang,
         kapasitasPerRuang: Math.min(24, Math.max(1, localRoomConfig.kapasitasPerRuang || 22)),
       };
       const roomRes = distributeRoomsCrossJenjang(
@@ -469,7 +514,11 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
         cleanRoomCfg,
         examConfig.moda,
         Math.random,
-        { examJumlahRuang: examConfig.jumlahRuang }
+        {
+          examJumlahRuang: feasibility.jumlahRuang,
+          jumlahSesi: feasibility.jumlahSesi,
+          autoAssignSessions: true,
+        }
       );
       const finalStudents = generateExamCredentials(roomRes.updatedStudents, {
         basis: credBasis,
@@ -484,6 +533,7 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
         students: finalStudents,
         rooms: roomRes.updatedRooms,
         roomConfig: { ...cleanRoomCfg, jumlahRuangManual: roomRes.updatedRooms.length },
+        jumlahSesi: feasibility.jumlahSesi,
       });
       await onSaveNumbering({
         students: finalStudents,
@@ -500,7 +550,9 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
       });
       setStatusBanner(
         `Generate Master selesai: Nomor Peserta, ${
-          examConfig.moda === 'online' ? `${examConfig.jumlahSesi} Sesi, ` : ''
+          feasibility.jumlahSesi > 1 || examConfig.moda === 'online'
+            ? `${feasibility.jumlahSesi} Sesi, `
+            : ''
         }${roomRes.updatedRooms.length} Ruang, serta User & Password berhasil dibuat untuk ${activeStudentsCount} peserta.`
       );
     } catch (err) {
@@ -742,16 +794,16 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
               />
             </div>
             <div>
-              <label className="block font-semibold text-slate-600 mb-1">Kapasitas / Ruang (Ideal 22, Maks 23)</label>
+              <label className="block font-semibold text-slate-600 mb-1">Kapasitas / Ruang (Ideal 22, Maks 24)</label>
               <input
                 type="number"
                 min={1}
-                max={23}
-                value={Math.min(23, localRoomConfig.kapasitasPerRuang || 22)}
+                max={24}
+                value={Math.min(24, localRoomConfig.kapasitasPerRuang || 22)}
                 onChange={(e) =>
                   setLocalRoomConfig({
                     ...localRoomConfig,
-                    kapasitasPerRuang: Math.min(23, Math.max(1, Number(e.target.value) || 22)),
+                    kapasitasPerRuang: Math.min(24, Math.max(1, Number(e.target.value) || 22)),
                   })
                 }
                 className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-mono tabular-nums"
@@ -799,7 +851,7 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
               {masterBusy === 'ruang' ? 'Membagi Ruang...' : 'Generate Pembagian Ruang'}
             </button>
 
-            {examConfig.moda === 'online' && (
+            {(examConfig.moda === 'online' || examConfig.jumlahSesi > 1) && (
               <button
                 type="button"
                 disabled={masterBusy !== ''}
@@ -894,14 +946,14 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
           <option value="unassigned">Belum Ada Ruang</option>
         </select>
 
-        {examConfig.moda === 'online' && (
+        {(examConfig.moda === 'online' || examConfig.jumlahSesi > 1 || students.some((s) => (s.sesi || 1) > 1)) && (
           <select
             value={filterSesi}
             onChange={(e) => setFilterSesi(e.target.value)}
             className="px-3 py-2 border border-slate-300 rounded-lg bg-white font-semibold"
           >
             <option value="all">Semua Sesi</option>
-            {Array.from({ length: examConfig.jumlahSesi }, (_, i) => i + 1).map((s) => (
+            {Array.from({ length: Math.max(1, examConfig.jumlahSesi) }, (_, i) => i + 1).map((s) => (
               <option key={s} value={String(s)}>Sesi {s}</option>
             ))}
           </select>
@@ -922,7 +974,9 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
                 <th className="px-3 py-3">Kelas</th>
                 <th className="px-3 py-3">No. Peserta</th>
                 <th className="px-3 py-3">User &amp; Pass Ujian</th>
-                {examConfig.moda === 'online' && <th className="px-3 py-3 text-center">Sesi</th>}
+                {(examConfig.moda === 'online' || examConfig.jumlahSesi > 1 || students.some((s) => (s.sesi || 1) > 1)) && (
+                  <th className="px-3 py-3 text-center">Sesi</th>
+                )}
                 <th className="px-3 py-3">Ruang / Meja</th>
                 <th className="px-3 py-3 text-center">Status</th>
                 {canEdit && <th className="px-3 py-3 text-right">Aksi</th>}
@@ -961,7 +1015,7 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
                           <span className="text-slate-400">-</span>
                         )}
                       </td>
-                      {examConfig.moda === 'online' && (
+                      {(examConfig.moda === 'online' || examConfig.jumlahSesi > 1 || students.some((s) => (s.sesi || 1) > 1)) && (
                         <td className="px-3 py-2.5 text-center font-semibold tabular-nums">
                           {st.sesi ? `Sesi ${st.sesi}` : '-'}
                         </td>

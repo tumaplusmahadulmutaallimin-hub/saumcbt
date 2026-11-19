@@ -270,6 +270,7 @@ export const saumApi = {
     students: Student[];
     rooms: ExamRoom[];
     roomConfig: RoomDistributionConfig;
+    jumlahSesi?: number;
   }) =>
     withFallback(
       () =>
