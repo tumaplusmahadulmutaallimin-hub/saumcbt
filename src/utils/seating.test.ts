@@ -6,7 +6,13 @@ import {
   distributeRoomsCrossJenjang,
   distributeStudents,
   getOrderedSeats,
+  getRoomFacilityTotals,
   moveOddStudentsToReserveRoom,
+  moveOrSwapStudentSeat,
+  normalizeRoomFacilities,
+  previewRoomDistribution,
+  swapPhysicalDesksInRoom,
+  validateRoomDistribution,
 } from './seating';
 import { ExamRoom, Student } from '../types';
 
@@ -306,4 +312,195 @@ test('distributeRoomsCrossJenjang spreads minority jenjang across rooms so every
   const parity = analyzeRoomParity(res.updatedStudents, res.updatedRooms, 'kertas', 1);
   assert.equal(parity.sameJenjangDeskConflicts.length, 0);
 });
+
+test('22 students (11 X + 11 XI) yield 11 cross-jenjang paired desks and pass all 9 validation rules', () => {
+  const mk = (count: number, jenjang: string): Student[] =>
+    Array.from({ length: count }, (_, i) => ({
+      id: `${jenjang}-id22-${i + 1}`,
+      nis: `${jenjang}${i + 1}`,
+      nisn: `0022${jenjang}${String(i + 1).padStart(3, '0')}`,
+      nama: `Siswa ${jenjang} ${i + 1}`,
+      tempatLahir: 'Kota',
+      tanggalLahir: '2009-01-01',
+      jenisKelamin: i % 2 === 0 ? 'L' : 'P',
+      kelas: `${jenjang}-A`,
+      jenjang,
+      nomorPeserta: `26-${jenjang}-${String(i + 1).padStart(3, '0')}`,
+      status: 'Aktif',
+    }));
+
+  const students = [...mk(11, 'X'), ...mk(11, 'XI')];
+  const { distribution, validation } = previewRoomDistribution(
+    students,
+    [],
+    { kapasitasPerRuang: 22, metode: 'silang_jenjang_11_11', jumlahRuangManual: 1, allowIncidental23: true },
+    'kertas',
+    1,
+    () => 0.3
+  );
+
+  assert.equal(distribution.updatedRooms.length, 1);
+  assert.equal(validation.isValid, true);
+  assert.equal(validation.errors.length, 0);
+  assert.equal(validation.roomMetrics[0].pairedDesks, 11);
+  assert.equal(validation.roomMetrics[0].soloDesks, 0);
+  assert.equal(validation.roomMetrics[0].sameJenjangConflicts, 0);
+});
+
+test('23 students (12 X + 11 XI) uses solo 23rd seat without reserve room and validates facility addition INSIDENTAL', () => {
+  const mk = (count: number, jenjang: string): Student[] =>
+    Array.from({ length: count }, (_, i) => ({
+      id: `${jenjang}-inc23-${i + 1}`,
+      nis: `${jenjang}${i + 1}`,
+      nisn: `0023${jenjang}${String(i + 1).padStart(3, '0')}`,
+      nama: `Siswa ${jenjang} ${i + 1}`,
+      tempatLahir: 'Kota',
+      tanggalLahir: '2009-01-01',
+      jenisKelamin: 'L',
+      kelas: `${jenjang}-A`,
+      jenjang,
+      nomorPeserta: `26-${jenjang}-${String(i + 1).padStart(3, '0')}`,
+      status: 'Aktif',
+    }));
+
+  const students = [...mk(12, 'X'), ...mk(11, 'XI')];
+  const initialRoom: ExamRoom = {
+    id: 'room-1',
+    nomorRuang: '01',
+    namaRuang: 'Ruang 01',
+    kapasitas: 22,
+    jumlahBaris: 4,
+    jumlahKolom: 6,
+    polaTempatDuduk: 'straight',
+    posisiPintu: 'kiri_depan',
+    posisiPengawas: 'depan_tengah',
+    mejaAwal: 11,
+    kursiAwal: 22,
+    mejaTambahan: 0,
+    kursiTambahan: 0,
+    statusFasilitas: 'NORMAL',
+  };
+
+  // Without extra desk/chair, facility check fails cleanly
+  const firstRun = previewRoomDistribution(
+    students,
+    [initialRoom],
+    { kapasitasPerRuang: 23, metode: 'silang_jenjang_11_11', jumlahRuangManual: 1, allowIncidental23: true },
+    'kertas',
+    1,
+    () => 0.4
+  );
+  assert.equal(firstRun.distribution.updatedRooms.length, 1);
+  assert.equal(firstRun.distribution.updatedRooms.some((r) => /cadangan/i.test(r.namaRuang)), false);
+  assert.equal(firstRun.validation.isValid, false);
+  assert.equal(
+    firstRun.validation.checks.find((c) => c.code === 'facility_sufficiency')?.passed,
+    false
+  );
+  assert.equal(firstRun.validation.roomMetrics[0].pairedDesks, 11);
+  assert.equal(firstRun.validation.roomMetrics[0].soloDesks, 1);
+  assert.equal(firstRun.validation.roomMetrics[0].sameJenjangConflicts, 0);
+
+  // Add +1 meja and +1 kursi via Manajemen Meja & Kursi -> becomes INSIDENTAL and passes 100%
+  const upgradedRoom = normalizeRoomFacilities(initialRoom, {
+    mejaTambahan: 1,
+    kursiTambahan: 1,
+    statusFasilitas: 'INSIDENTAL',
+    keteranganFasilitas: 'Insidental siswa ke-23 duduk sendiri',
+  });
+  assert.equal(getRoomFacilityTotals(upgradedRoom).totalMeja, 12);
+  assert.equal(getRoomFacilityTotals(upgradedRoom).totalKursi, 23);
+
+  const secondRun = previewRoomDistribution(
+    students,
+    [upgradedRoom],
+    { kapasitasPerRuang: 23, metode: 'silang_jenjang_11_11', jumlahRuangManual: 1, allowIncidental23: true },
+    'kertas',
+    1,
+    () => 0.4
+  );
+  assert.equal(secondRun.validation.isValid, true);
+  assert.equal(secondRun.validation.errors.length, 0);
+  // Preserves facility additions across Re-Generate!
+  assert.equal(secondRun.distribution.updatedRooms[0].mejaTambahan, 1);
+  assert.equal(secondRun.distribution.updatedRooms[0].statusFasilitas, 'INSIDENTAL');
+});
+
+test('Imbalanced counts (16 X + 6 XI) never create same-jenjang desk pairs and report facility requirement', () => {
+  const mk = (count: number, jenjang: string): Student[] =>
+    Array.from({ length: count }, (_, i) => ({
+      id: `${jenjang}-imb-${i + 1}`,
+      nis: `${jenjang}${i + 1}`,
+      nisn: `0016${jenjang}${String(i + 1).padStart(3, '0')}`,
+      nama: `Siswa ${jenjang} ${i + 1}`,
+      tempatLahir: 'Kota',
+      tanggalLahir: '2009-01-01',
+      jenisKelamin: 'P',
+      kelas: `${jenjang}-A`,
+      jenjang,
+      nomorPeserta: `26-${jenjang}-${String(i + 1).padStart(3, '0')}`,
+      status: 'Aktif',
+    }));
+
+  const students = [...mk(16, 'X'), ...mk(6, 'XI')];
+  const { distribution, validation } = previewRoomDistribution(
+    students,
+    [],
+    { kapasitasPerRuang: 22, metode: 'silang_jenjang_11_11', jumlahRuangManual: 1 },
+    'kertas',
+    1,
+    () => 0.1
+  );
+
+  // Absolute rule: 0 same-jenjang pairs even under heavy imbalance
+  assert.equal(validation.roomMetrics[0].sameJenjangConflicts, 0);
+  assert.equal(validation.roomMetrics[0].pairedDesks, 6);
+  assert.equal(validation.roomMetrics[0].soloDesks, 10);
+  assert.equal(distribution.updatedRooms.length, 1);
+  // Reports facility shortage cleanly (needs 16 desks, base room has 11 desks)
+  assert.equal(
+    validation.checks.find((c) => c.code === 'facility_sufficiency')?.passed,
+    false
+  );
+});
+
+test('Edit Denah moveOrSwapStudentSeat blocks same-jenjang desk pairing and allows valid swaps', () => {
+  const room: ExamRoom = {
+    id: 'room-1',
+    nomorRuang: '01',
+    namaRuang: 'Ruang 01',
+    kapasitas: 22,
+    jumlahBaris: 4,
+    jumlahKolom: 6,
+    polaTempatDuduk: 'straight',
+    posisiPintu: 'kiri_depan',
+    posisiPengawas: 'depan_tengah',
+    mejaAwal: 11,
+    kursiAwal: 22,
+  };
+
+  const students: Student[] = [
+    { id: 's1', nis: '1', nisn: '1', nama: 'A', tempatLahir: 'K', tanggalLahir: '2009-01-01', jenisKelamin: 'L', kelas: 'X-A', jenjang: 'X', nomorPeserta: '01', status: 'Aktif', ruangId: 'room-1', nomorMeja: 1 },
+    { id: 's2', nis: '2', nisn: '2', nama: 'B', tempatLahir: 'K', tanggalLahir: '2009-01-01', jenisKelamin: 'P', kelas: 'XI-A', jenjang: 'XI', nomorPeserta: '02', status: 'Aktif', ruangId: 'room-1', nomorMeja: 2 },
+    { id: 's3', nis: '3', nisn: '3', nama: 'C', tempatLahir: 'K', tanggalLahir: '2009-01-01', jenisKelamin: 'L', kelas: 'X-B', jenjang: 'X', nomorPeserta: '03', status: 'Aktif', ruangId: 'room-1', nomorMeja: 3 },
+    { id: 's4', nis: '4', nisn: '4', nama: 'D', tempatLahir: 'K', tanggalLahir: '2009-01-01', jenisKelamin: 'P', kelas: 'XI-B', jenjang: 'XI', nomorPeserta: '04', status: 'Aktif', ruangId: 'room-1', nomorMeja: 4 },
+  ];
+
+  // Attempt to swap s1 (X) with s4 (XI) -> puts s1 (X) next to s3 (X) at Meja 2 -> MUST BE BLOCKED!
+  const invalidSwap = moveOrSwapStudentSeat(students, [room], 's1', 'room-1', 4, false);
+  assert.equal(invalidSwap.ok, false);
+  assert.match(invalidSwap.error || '', /jenjang yang sama/i);
+
+  // Swap s1 (X) with s3 (X) -> preserves X+XI on both Meja 1 and Meja 2 -> MUST SUCCEED!
+  const validSwap = moveOrSwapStudentSeat(students, [room], 's1', 'room-1', 3, false);
+  assert.equal(validSwap.ok, true);
+  const valAfter = validateRoomDistribution(validSwap.updatedStudents, [room], 'kertas', 1);
+  assert.equal(valAfter.isValid, true);
+
+  // Swap entire physical Desk 1 <-> Desk 2
+  const deskSwapped = swapPhysicalDesksInRoom(validSwap.updatedStudents, 'room-1', 1, 2, false);
+  assert.equal(deskSwapped.find((s) => s.id === 's2')?.nomorMeja, 4);
+  assert.equal(deskSwapped.find((s) => s.id === 's4')?.nomorMeja, 2);
+});
+
 

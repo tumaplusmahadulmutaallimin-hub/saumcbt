@@ -527,6 +527,11 @@ export function distributeRoomsCrossJenjang(
     const existing = normalExisting[i];
     const roomNumStr = String(i + 1).padStart(2, '0');
     if (existing) {
+      const mejaAwal = existing.mejaAwal ?? Math.ceil(Math.min(22, maxCap) / 2);
+      const kursiAwal = existing.kursiAwal ?? Math.min(22, maxCap);
+      const mejaTambahan = existing.mejaTambahan ?? 0;
+      const kursiTambahan = existing.kursiTambahan ?? 0;
+      const totalKursi = kursiTambahan > 0 ? kursiAwal + kursiTambahan : maxCap;
       rooms.push({
         ...existing,
         nomorRuang: roomNumStr,
@@ -534,11 +539,20 @@ export function distributeRoomsCrossJenjang(
           existing.namaRuang && !/^Ruang\s+\d+$/i.test(existing.namaRuang)
             ? existing.namaRuang
             : `Ruang ${roomNumStr}`,
-        kapasitas: maxCap,
+        kapasitas: totalKursi,
+        mejaAwal,
+        kursiAwal,
+        mejaTambahan,
+        kursiTambahan,
+        statusFasilitas: mejaTambahan > 0 || kursiTambahan > 0 ? 'INSIDENTAL' : (existing.statusFasilitas || 'NORMAL'),
+        jarakAntarMeja: existing.jarakAntarMeja || 'standar',
         jumlahKolom: 6,
-        jumlahBaris: Math.ceil(maxCap / 6),
+        jumlahBaris: Math.ceil(totalKursi / 6),
+        incidentalSeatNo: undefined,
       });
     } else {
+      const mejaAwal = Math.ceil(Math.min(22, maxCap) / 2);
+      const kursiAwal = maxCap;
       rooms.push({
         id: `room-${i + 1}`,
         nomorRuang: roomNumStr,
@@ -550,6 +564,13 @@ export function distributeRoomsCrossJenjang(
         posisiPintu: 'kiri_depan',
         posisiPengawas: 'depan_tengah',
         isLocked: false,
+        mejaAwal,
+        kursiAwal,
+        mejaTambahan: 0,
+        kursiTambahan: 0,
+        statusFasilitas: 'NORMAL',
+        keteranganFasilitas: '',
+        jarakAntarMeja: 'standar',
       });
     }
   }
@@ -565,7 +586,7 @@ export function distributeRoomsCrossJenjang(
     const totalRoomCapacity = rooms.reduce((acc, r) => acc + r.kapasitas, 0);
     if (pool.length > totalRoomCapacity) {
       warnings.push(
-        `${sesiKey > 0 ? `Sesi ${sesiKey}: ` : ''}Jumlah peserta (${pool.length}) melebihi total kapasitas ${rooms.length} ruang (${totalRoomCapacity} kursi). Pertimbangkan menambah ruang atau memindahkan ke Ruang Cadangan.`
+        `${sesiKey > 0 ? `Sesi ${sesiKey}: ` : ''}Jumlah peserta (${pool.length}) melebihi total kapasitas fasilitas ${rooms.length} ruang (${totalRoomCapacity} kursi). Tambahkan meja/kursi pada menu Manajemen Meja dan Kursi atau sesuaikan jumlah ruang.`
       );
     }
 
@@ -631,7 +652,7 @@ export function distributeRoomsCrossJenjang(
     }
 
     // Arrange physical desks per room: every 2-seat desk holds 2 DIFFERENT jenjangs;
-    // any unpaired surplus student sits ALONE on a dedicated desk (12th desk etc. allowed).
+    // any unpaired surplus student sits ALONE on a dedicated desk (e.g. #23 Tempat Duduk Tambahan).
     rooms.forEach((room, rIdx) => {
       const roomPool = roomAllocations[rIdx] || [];
       const { desks, seatAssignments } = buildCrossJenjangDeskLayout(roomPool, rng);
@@ -643,14 +664,20 @@ export function distributeRoomsCrossJenjang(
         jenjangCounts[jen] = (jenjangCounts[jen] || 0) + 1;
       });
 
+      if (roomPool.length === 23) {
+        const lastSolo = seatAssignments.find((a) => a.nomorMeja >= 23) || seatAssignments[seatAssignments.length - 1];
+        if (lastSolo) {
+          room.incidentalSeatNo = lastSolo.nomorMeja;
+        }
+      }
+
       const physicalSeatSpan = desks.length * 2;
       if (physicalSeatSpan > room.kapasitas && roomPool.length <= 24 && desks.length <= 12) {
-        // Solo desks require up to 12 meja (24 kursi slots) -> adjust room metadata cleanly without false overflow
         room.jumlahBaris = Math.max(room.jumlahBaris, Math.ceil(physicalSeatSpan / 6));
       }
       if (roomPool.length > room.kapasitas) {
         warnings.push(
-          `${room.namaRuang}${sesiKey > 0 ? ` (Sesi ${sesiKey})` : ''}: Jumlah peserta (${roomPool.length}) melebihi kapasitas maksimal (${room.kapasitas}).`
+          `${room.namaRuang}${sesiKey > 0 ? ` (Sesi ${sesiKey})` : ''}: Terisi ${roomPool.length} peserta sedangkan kursi tersedia ${room.kapasitas}. Tambahkan meja & kursi di Manajemen Meja dan Kursi.`
         );
       }
       const distinctJenjang = Object.keys(jenjangCounts).length;
@@ -692,6 +719,581 @@ export function distributeRoomsCrossJenjang(
     warnings,
     summary,
   };
+}
+
+export interface RoomFacilityTotals {
+  mejaAwal: number;
+  kursiAwal: number;
+  mejaTambahan: number;
+  kursiTambahan: number;
+  totalMeja: number;
+  totalKursi: number;
+  statusFasilitas: 'NORMAL' | 'INSIDENTAL';
+}
+
+export function getRoomFacilityTotals(room: ExamRoom): RoomFacilityTotals {
+  const kursiAwal = room.kursiAwal ?? Math.min(22, Math.max(1, room.kapasitas || 22));
+  const mejaAwal = room.mejaAwal ?? Math.ceil(kursiAwal / 2);
+  const mejaTambahan = Math.max(0, room.mejaTambahan ?? Math.max(0, Math.ceil((room.kapasitas || 22) / 2) - mejaAwal));
+  const kursiTambahan = Math.max(0, room.kursiTambahan ?? Math.max(0, (room.kapasitas || 22) - kursiAwal));
+  const statusFasilitas: 'NORMAL' | 'INSIDENTAL' =
+    mejaTambahan > 0 || kursiTambahan > 0 ? 'INSIDENTAL' : (room.statusFasilitas || 'NORMAL');
+  return {
+    mejaAwal,
+    kursiAwal,
+    mejaTambahan,
+    kursiTambahan,
+    totalMeja: mejaAwal + mejaTambahan,
+    totalKursi: kursiAwal + kursiTambahan,
+    statusFasilitas,
+  };
+}
+
+export function normalizeRoomFacilities(
+  room: ExamRoom,
+  overrides: Partial<Pick<ExamRoom, 'mejaAwal' | 'kursiAwal' | 'mejaTambahan' | 'kursiTambahan' | 'keteranganFasilitas' | 'statusFasilitas' | 'jarakAntarMeja'>>
+): ExamRoom {
+  const base = getRoomFacilityTotals(room);
+  const mejaAwal = Math.max(1, overrides.mejaAwal ?? base.mejaAwal);
+  const kursiAwal = Math.max(1, overrides.kursiAwal ?? base.kursiAwal);
+  const mejaTambahan = Math.max(0, overrides.mejaTambahan ?? base.mejaTambahan);
+  const kursiTambahan = Math.max(0, overrides.kursiTambahan ?? base.kursiTambahan);
+  const totalKursi = kursiAwal + kursiTambahan;
+  const totalMeja = mejaAwal + mejaTambahan;
+  const computedStatus: 'NORMAL' | 'INSIDENTAL' =
+    overrides.statusFasilitas || (mejaTambahan > 0 || kursiTambahan > 0 ? 'INSIDENTAL' : 'NORMAL');
+
+  return {
+    ...room,
+    mejaAwal,
+    kursiAwal,
+    mejaTambahan,
+    kursiTambahan,
+    statusFasilitas: computedStatus,
+    keteranganFasilitas:
+      overrides.keteranganFasilitas !== undefined
+        ? overrides.keteranganFasilitas
+        : room.keteranganFasilitas || '',
+    jarakAntarMeja: overrides.jarakAntarMeja ?? room.jarakAntarMeja ?? 'standar',
+    kapasitas: totalKursi,
+    jumlahKolom: 6,
+    jumlahBaris: Math.max(room.jumlahBaris || 4, Math.ceil((totalMeja * 2) / 6)),
+  };
+}
+
+export interface ValidationCheckItem {
+  code:
+    | 'no_reserve_room'
+    | 'no_missing_students'
+    | 'no_duplicate_students'
+    | 'cross_jenjang_desks'
+    | 'incidental_capacity'
+    | 'incidental_23_solo_seat'
+    | 'facility_sufficiency'
+    | 'no_seat_collision'
+    | 'multi_jenjang_rooms';
+  label: string;
+  passed: boolean;
+  severity: 'error' | 'warning';
+  detail: string;
+  affectedRoomIds?: string[];
+}
+
+export interface RoomValidationMetric {
+  roomId: string;
+  roomName: string;
+  sesi?: number;
+  studentCount: number;
+  desksUsed: number;
+  pairedDesks: number;
+  soloDesks: number;
+  sameJenjangConflicts: number;
+  seatCollisions: number;
+  facilities: RoomFacilityTotals;
+  jenjangCounts: Record<string, number>;
+  incidentalSeatNo?: number;
+}
+
+export interface RoomDistributionValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+  checks: ValidationCheckItem[];
+  roomMetrics: RoomValidationMetric[];
+}
+
+/**
+ * Full 9-point Automatic Validation before saving generated/edited room allocations.
+ */
+export function validateRoomDistribution(
+  students: Student[],
+  rooms: ExamRoom[],
+  moda: ModaUjian = 'kertas',
+  jumlahSesi: number = 1
+): RoomDistributionValidationResult {
+  const activeStudents = students.filter((s) => s.status === 'Aktif');
+  const isOnline = moda === 'online';
+  const sessionList = isOnline
+    ? Array.from({ length: Math.max(1, jumlahSesi) }, (_, i) => i + 1)
+    : [undefined];
+
+  const roomIdsSet = new Set(rooms.map((r) => r.id));
+  const reserveRooms = rooms.filter(
+    (r) => r.id.startsWith('room-cadangan') || /cadangan/i.test(r.namaRuang)
+  );
+
+  // Missing & duplicate checks
+  const unassigned = activeStudents.filter((s) => !s.ruangId || !roomIdsSet.has(s.ruangId) || !s.nomorMeja);
+  const seenIds = new Set<string>();
+  const duplicateIds: string[] = [];
+  for (const s of activeStudents) {
+    if (seenIds.has(s.id)) duplicateIds.push(s.nama);
+    seenIds.add(s.id);
+  }
+
+  const roomMetrics: RoomValidationMetric[] = [];
+  const sameJenjangMsgs: string[] = [];
+  const over23Msgs: string[] = [];
+  const facilityShortageMsgs: string[] = [];
+  const facilityShortageRoomIds = new Set<string>();
+  const incidental23ViolationMsgs: string[] = [];
+  const collisionMsgs: string[] = [];
+  const singleJenjangMsgs: string[] = [];
+
+  const globalJenjangSet = new Set(
+    activeStudents.map((s) => s.jenjang || extractJenjang(s.kelas))
+  );
+
+  for (const room of rooms) {
+    const facilities = getRoomFacilityTotals(room);
+    for (const sesiVal of sessionList) {
+      const occupants = activeStudents.filter(
+        (s) => s.ruangId === room.id && (!isOnline || (s.sesi || 1) === sesiVal)
+      );
+      if (occupants.length === 0) continue;
+
+      const sesiTag = sesiVal ? ` Sesi ${sesiVal}` : '';
+      const seatCounts = new Map<number, Student[]>();
+      const byDesk = new Map<number, Student[]>();
+      const jenjangCounts: Record<string, number> = {};
+
+      occupants.forEach((st) => {
+        const j = st.jenjang || extractJenjang(st.kelas);
+        jenjangCounts[j] = (jenjangCounts[j] || 0) + 1;
+        const seatNo = st.nomorMeja || 0;
+        if (seatNo > 0) {
+          if (!seatCounts.has(seatNo)) seatCounts.set(seatNo, []);
+          seatCounts.get(seatNo)!.push(st);
+          const deskNo = Math.ceil(seatNo / 2);
+          if (!byDesk.has(deskNo)) byDesk.set(deskNo, []);
+          byDesk.get(deskNo)!.push(st);
+        }
+      });
+
+      let seatCollisions = 0;
+      seatCounts.forEach((arr, seatNo) => {
+        if (arr.length > 1) {
+          seatCollisions++;
+          collisionMsgs.push(`${room.namaRuang}${sesiTag}: Kursi #${seatNo} ditempati ganda oleh ${arr.map((a) => a.nama).join(' & ')}.`);
+        }
+      });
+
+      let sameJenjangConflicts = 0;
+      let pairedDesks = 0;
+      let soloDesks = 0;
+      let incidentalSeatNo: number | undefined = room.incidentalSeatNo;
+
+      byDesk.forEach((deskStudents, deskNo) => {
+        if (deskStudents.length === 1) {
+          soloDesks++;
+          if (occupants.length === 23 && !incidentalSeatNo) {
+            incidentalSeatNo = deskStudents[0].nomorMeja;
+          }
+        } else if (deskStudents.length === 2) {
+          pairedDesks++;
+          const j1 = deskStudents[0].jenjang || extractJenjang(deskStudents[0].kelas);
+          const j2 = deskStudents[1].jenjang || extractJenjang(deskStudents[1].kelas);
+          if (j1 === j2) {
+            sameJenjangConflicts++;
+            sameJenjangMsgs.push(
+              `${room.namaRuang}${sesiTag} Meja ${deskNo}: Pasangan ${deskStudents[0].nama} (${j1}) & ${deskStudents[1].nama} (${j2}) berasal dari jenjang yang sama.`
+            );
+          }
+        } else if (deskStudents.length > 2) {
+          seatCollisions++;
+          collisionMsgs.push(`${room.namaRuang}${sesiTag} Meja ${deskNo}: Meja ditempati lebih dari 2 siswa.`);
+        }
+      });
+
+      const maxDeskUsed = Math.max(byDesk.size, ...Array.from(byDesk.keys()), 0);
+      const desksUsed = Math.max(byDesk.size, maxDeskUsed);
+
+      if (occupants.length > 23) {
+        over23Msgs.push(
+          `${room.namaRuang}${sesiTag}: Terisi ${occupants.length} siswa, melebihi batas insidental maksimal 23 siswa per ruang.`
+        );
+      }
+
+      if (occupants.length === 23) {
+        if (soloDesks < 1 || sameJenjangConflicts > 0 || pairedDesks < 11) {
+          incidental23ViolationMsgs.push(
+            `${room.namaRuang}${sesiTag}: Kondisi 23 siswa harus terdiri dari 11 meja berpasangan lintas jenjang + 1 siswa duduk sendiri di meja tambahan.`
+          );
+        }
+      }
+
+      if (occupants.length > facilities.totalKursi || desksUsed > facilities.totalMeja) {
+        facilityShortageRoomIds.add(room.id);
+        facilityShortageMsgs.push(
+          `${room.namaRuang}${sesiTag}: Membutuhkan ${desksUsed} meja & ${occupants.length} kursi, namun fasilitas saat ini ${facilities.totalMeja} meja & ${facilities.totalKursi} kursi. Tambahkan melalui Manajemen Meja dan Kursi.`
+        );
+      }
+
+      if (occupants.length >= 2 && Object.keys(jenjangCounts).length < 2 && globalJenjangSet.size >= 2) {
+        singleJenjangMsgs.push(
+          `${room.namaRuang}${sesiTag}: Hanya berisi 1 jenjang (${Object.keys(jenjangCounts)[0]}).`
+        );
+      }
+
+      roomMetrics.push({
+        roomId: room.id,
+        roomName: room.namaRuang,
+        sesi: sesiVal,
+        studentCount: occupants.length,
+        desksUsed,
+        pairedDesks,
+        soloDesks,
+        sameJenjangConflicts,
+        seatCollisions,
+        facilities,
+        jenjangCounts,
+        incidentalSeatNo,
+      });
+    }
+  }
+
+  const checks: ValidationCheckItem[] = [
+    {
+      code: 'no_reserve_room',
+      label: 'Tidak ada ruang cadangan',
+      passed: reserveRooms.length === 0,
+      severity: 'error',
+      detail:
+        reserveRooms.length === 0
+          ? 'Seluruh alokasi menggunakan ruang ujian reguler yang tersedia.'
+          : `Ditemukan ruang cadangan (${reserveRooms.map((r) => r.namaRuang).join(', ')}). Hapus ruang cadangan sesuai ketentuan.`,
+    },
+    {
+      code: 'no_missing_students',
+      label: 'Seluruh siswa aktif mendapatkan tempat duduk',
+      passed: unassigned.length === 0,
+      severity: 'error',
+      detail:
+        unassigned.length === 0
+          ? `${activeStudents.length} dari ${activeStudents.length} siswa aktif teralokasi lengkap.`
+          : `${unassigned.length} siswa aktif belum memiliki ruang/nomor kursi (${unassigned.slice(0, 3).map((s) => s.nama).join(', ')}).`,
+    },
+    {
+      code: 'no_duplicate_students',
+      label: 'Tidak ada siswa terduplikasi',
+      passed: duplicateIds.length === 0,
+      severity: 'error',
+      detail:
+        duplicateIds.length === 0
+          ? 'Setiap siswa hanya menempati tepat 1 kursi.'
+          : `Ditemukan duplikasi data siswa: ${duplicateIds.join(', ')}.`,
+    },
+    {
+      code: 'cross_jenjang_desks',
+      label: 'Setiap meja berpasangan berisi 2 jenjang berbeda',
+      passed: sameJenjangMsgs.length === 0,
+      severity: 'error',
+      detail:
+        sameJenjangMsgs.length === 0
+          ? '0 pasangan meja dari jenjang yang sama (aturan wajib terpenuhi).'
+          : sameJenjangMsgs.join(' | '),
+    },
+    {
+      code: 'incidental_capacity',
+      label: 'Kapasitas ideal ≤ 22 siswa / insidental maks 23 siswa',
+      passed: over23Msgs.length === 0,
+      severity: 'error',
+      detail:
+        over23Msgs.length === 0
+          ? 'Semua ruang berada dalam batas kapasitas ideal (22) atau insidental (23).'
+          : over23Msgs.join(' | '),
+    },
+    {
+      code: 'incidental_23_solo_seat',
+      label: 'Siswa ke-23 duduk sendiri di tempat duduk tambahan',
+      passed: incidental23ViolationMsgs.length === 0,
+      severity: 'error',
+      detail:
+        incidental23ViolationMsgs.length === 0
+          ? roomMetrics.some((m) => m.studentCount === 23)
+            ? 'Ruang berkapasitas insidental 23 telah menempatkan siswa ke-23 di meja tambahan secara mandiri.'
+            : 'Tidak ada ruang insidental 23 atau seluruh meja tambahan valid.'
+          : incidental23ViolationMsgs.join(' | '),
+    },
+    {
+      code: 'facility_sufficiency',
+      label: 'Meja & kursi mencukupi kebutuhan ruang',
+      passed: facilityShortageMsgs.length === 0,
+      severity: 'error',
+      detail:
+        facilityShortageMsgs.length === 0
+          ? 'Jumlah meja dan kursi awal/tambahan pada seluruh ruang mencukupi.'
+          : facilityShortageMsgs.join(' | '),
+      affectedRoomIds: Array.from(facilityShortageRoomIds),
+    },
+    {
+      code: 'no_seat_collision',
+      label: 'Tidak ada bentrok posisi meja dan kursi',
+      passed: collisionMsgs.length === 0,
+      severity: 'error',
+      detail:
+        collisionMsgs.length === 0
+          ? 'Semua nomor kursi dan pasangan meja unik tanpa bentrok.'
+          : collisionMsgs.join(' | '),
+    },
+    {
+      code: 'multi_jenjang_rooms',
+      label: 'Komposisi dua jenjang berbeda tiap ruang',
+      passed: singleJenjangMsgs.length === 0,
+      severity: 'warning',
+      detail:
+        singleJenjangMsgs.length === 0
+          ? 'Setiap ruang berisi minimal 2 jenjang berbeda.'
+          : `${singleJenjangMsgs.join(' | ')} (Periksa keseimbangan jumlah siswa per jenjang di DNPU).`,
+    },
+  ];
+
+  const errors = checks.filter((c) => !c.passed && c.severity === 'error').map((c) => c.detail);
+  const warnings = checks.filter((c) => !c.passed && c.severity === 'warning').map((c) => c.detail);
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    warnings,
+    checks,
+    roomMetrics,
+  };
+}
+
+/**
+ * Generates a non-destructive preview of Room Distribution & validates all rules BEFORE saving.
+ */
+export function previewRoomDistribution(
+  students: Student[],
+  existingRooms: ExamRoom[],
+  config: RoomDistributionConfig,
+  moda: ModaUjian = 'kertas',
+  jumlahSesi: number = 1,
+  rng: () => number = Math.random,
+  options?: { examJumlahRuang?: number }
+): {
+  distribution: RoomDistributionResult;
+  validation: RoomDistributionValidationResult;
+} {
+  const clonedRooms = existingRooms.map((r) => ({ ...r }));
+  const clonedStudents = students.map((s) => ({ ...s }));
+  const distribution = distributeRoomsCrossJenjang(
+    clonedStudents,
+    clonedRooms,
+    config,
+    moda,
+    rng,
+    options
+  );
+  const validation = validateRoomDistribution(
+    distribution.updatedStudents,
+    distribution.updatedRooms,
+    moda,
+    jumlahSesi
+  );
+  return { distribution, validation };
+}
+
+/**
+ * Validates moving or swapping a student in Edit Denah without ever allowing same-jenjang desk mates.
+ */
+export function validateManualSeatMove(
+  roomStudents: Student[],
+  movingStudent: Student,
+  targetSeatNo: number,
+  targetRoom: ExamRoom,
+  swappedWithStudent?: Student
+): { ok: boolean; error?: string } {
+  const facilities = getRoomFacilityTotals(targetRoom);
+  const targetDeskNo = Math.ceil(targetSeatNo / 2);
+
+  if (targetSeatNo < 1 || targetSeatNo > Math.max(24, facilities.totalMeja * 2)) {
+    return {
+      ok: false,
+      error: `Nomor kursi #${targetSeatNo} di luar rentang fasilitas ${targetRoom.namaRuang}.`,
+    };
+  }
+  if (!swappedWithStudent) {
+    if (roomStudents.length + 1 > 23) {
+      return {
+        ok: false,
+        error: `${targetRoom.namaRuang} sudah mencapai kapasitas insidental maksimal 23 siswa.`,
+      };
+    }
+    if (roomStudents.length + 1 > facilities.totalKursi || targetDeskNo > facilities.totalMeja) {
+      return {
+        ok: false,
+        error: `Kursi/Meja tambahan belum tersedia di ${targetRoom.namaRuang} (${facilities.totalMeja} meja, ${facilities.totalKursi} kursi). Tambahkan terlebih dahulu di Manajemen Meja dan Kursi.`,
+      };
+    }
+  } else if (targetDeskNo > facilities.totalMeja) {
+    return {
+      ok: false,
+      error: `Meja ${targetDeskNo} melebihi jumlah meja tersedia (${facilities.totalMeja}) di ${targetRoom.namaRuang}.`,
+    };
+  }
+
+  // Enforce absolute rule: two students of the same jenjang CANNOT sit on the same physical desk
+  const partnerSeatNo = targetSeatNo % 2 === 1 ? targetSeatNo + 1 : targetSeatNo - 1;
+  const partner = roomStudents.find(
+    (s) =>
+      s.nomorMeja === partnerSeatNo &&
+      s.id !== movingStudent.id &&
+      s.id !== swappedWithStudent?.id
+  );
+  if (partner) {
+    const movingJen = movingStudent.jenjang || extractJenjang(movingStudent.kelas);
+    const partnerJen = partner.jenjang || extractJenjang(partner.kelas);
+    if (movingJen === partnerJen) {
+      return {
+        ok: false,
+        error: `Pelanggaran Aturan Meja: ${movingStudent.nama} (${movingStudent.kelas}) tidak boleh dipasangkan di Meja ${String(targetDeskNo).padStart(2, '0')} bersama ${partner.nama} (${partner.kelas}) karena berasal dari jenjang yang sama (${movingJen}).`,
+      };
+    }
+  }
+
+  // If swapping two students inside the same room, also validate the partner at movingStudent's old desk
+  if (swappedWithStudent && movingStudent.ruangId === swappedWithStudent.ruangId && movingStudent.nomorMeja) {
+    const oldSeatNo = movingStudent.nomorMeja;
+    const oldDeskNo = Math.ceil(oldSeatNo / 2);
+    // If both swapped students aren't already partners at the same desk:
+    if (oldDeskNo !== targetDeskNo) {
+      const oldPartnerSeat = oldSeatNo % 2 === 1 ? oldSeatNo + 1 : oldSeatNo - 1;
+      const oldPartner = roomStudents.find(
+        (s) =>
+          s.nomorMeja === oldPartnerSeat &&
+          s.id !== movingStudent.id &&
+          s.id !== swappedWithStudent.id
+      );
+      if (oldPartner) {
+        const swapJen = swappedWithStudent.jenjang || extractJenjang(swappedWithStudent.kelas);
+        const oldPartnerJen = oldPartner.jenjang || extractJenjang(oldPartner.kelas);
+        if (swapJen === oldPartnerJen) {
+          return {
+            ok: false,
+            error: `Pelanggaran Aturan Meja: Pertukaran akan menempatkan ${swappedWithStudent.nama} (${swappedWithStudent.kelas}) bersama ${oldPartner.nama} (${oldPartner.kelas}) pada jenjang yang sama (${swapJen}) di Meja ${String(oldDeskNo).padStart(2, '0')}.`,
+          };
+        }
+      }
+    }
+  }
+
+  return { ok: true };
+}
+
+/**
+ * Moves or swaps a student onto targetSeatNo in targetRoomId while strictly enforcing cross-jenjang desk pairing.
+ */
+export function moveOrSwapStudentSeat(
+  students: Student[],
+  rooms: ExamRoom[],
+  studentId: string,
+  targetRoomId: string,
+  targetSeatNo: number,
+  isOnline: boolean,
+  targetSesi?: number
+): { ok: boolean; error?: string; updatedStudents: Student[] } {
+  const moving = students.find((s) => s.id === studentId);
+  const targetRoom = rooms.find((r) => r.id === targetRoomId);
+  if (!moving || !targetRoom) {
+    return { ok: false, error: 'Peserta atau ruang tujuan tidak ditemukan.', updatedStudents: students };
+  }
+
+  const effectiveSesi = isOnline ? (targetSesi || moving.sesi || 1) : undefined;
+  const targetRoomOccupants = students.filter(
+    (s) =>
+      s.status === 'Aktif' &&
+      s.ruangId === targetRoomId &&
+      (!isOnline || (s.sesi || 1) === effectiveSesi)
+  );
+  const occupantAtTarget = targetRoomOccupants.find(
+    (s) => s.nomorMeja === targetSeatNo && s.id !== moving.id
+  );
+
+  const check = validateManualSeatMove(
+    targetRoomOccupants,
+    moving,
+    targetSeatNo,
+    targetRoom,
+    occupantAtTarget
+  );
+  if (!check.ok) {
+    return { ok: false, error: check.error, updatedStudents: students };
+  }
+
+  const oldRoomId = moving.ruangId;
+  const oldSeatNo = moving.nomorMeja;
+  const oldSesi = moving.sesi;
+
+  const updatedStudents = students.map((s) => {
+    if (s.id === moving.id) {
+      return {
+        ...s,
+        ruangId: targetRoomId,
+        nomorMeja: targetSeatNo,
+        sesi: isOnline ? effectiveSesi : s.sesi,
+      };
+    }
+    if (occupantAtTarget && s.id === occupantAtTarget.id) {
+      return {
+        ...s,
+        ruangId: oldRoomId,
+        nomorMeja: oldSeatNo,
+        sesi: isOnline ? oldSesi : s.sesi,
+      };
+    }
+    return s;
+  });
+
+  return { ok: true, updatedStudents };
+}
+
+/**
+ * Swaps two physical desks (both left and right seats together) inside a room.
+ */
+export function swapPhysicalDesksInRoom(
+  students: Student[],
+  roomId: string,
+  deskA: number,
+  deskB: number,
+  isOnline: boolean,
+  sesi?: number
+): Student[] {
+  if (deskA === deskB || deskA < 1 || deskB < 1) return students;
+  const aLeft = deskA * 2 - 1;
+  const aRight = deskA * 2;
+  const bLeft = deskB * 2 - 1;
+  const bRight = deskB * 2;
+
+  return students.map((s) => {
+    if (s.status !== 'Aktif' || s.ruangId !== roomId) return s;
+    if (isOnline && sesi && (s.sesi || 1) !== sesi) return s;
+    if (s.nomorMeja === aLeft) return { ...s, nomorMeja: bLeft };
+    if (s.nomorMeja === aRight) return { ...s, nomorMeja: bRight };
+    if (s.nomorMeja === bLeft) return { ...s, nomorMeja: aLeft };
+    if (s.nomorMeja === bRight) return { ...s, nomorMeja: aRight };
+    return s;
+  });
 }
 
 export interface OddRoomEntry {

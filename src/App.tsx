@@ -53,7 +53,7 @@ import { PengaturanUjianView } from './components/views/PengaturanUjianView';
 import { DnpuView } from './components/views/DnpuView';
 import { PenomoranView } from './components/views/PenomoranView';
 import { NomorMejaView } from './components/views/NomorMejaView';
-import { RuangSesiView } from './components/views/RuangSesiView';
+import { RuangSesiSubTab, RuangSesiView } from './components/views/RuangSesiView';
 import { DenahLokasiView } from './components/views/DenahLokasiView';
 import { DenahRuangView } from './components/views/DenahRuangView';
 import { DaftarHadirView } from './components/views/DaftarHadirView';
@@ -102,6 +102,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<SaumModuleKey>('dashboard');
   const [activeDocSubtype, setActiveDocSubtype] = useState<DocumentType>('denah_ruang');
   const [activeRoomContextId, setActiveRoomContextId] = useState<string>('all');
+  const [ruangSesiTab, setRuangSesiTab] = useState<RuangSesiSubTab>('generate');
   const [pengaturanTab, setPengaturanTab] = useState<'madrasah_kop' | 'kertas' | 'panitia' | 'akses'>('madrasah_kop');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -541,6 +542,8 @@ export default function App() {
                   roomConfig={state.roomConfig}
                   examConfig={state.examConfig}
                   canEdit={canRoleEdit(currentUser.role, 'ruang_sesi')}
+                  initialSubTab={ruangSesiTab}
+                  initialRoomId={activeRoomContextId !== 'all' ? activeRoomContextId : undefined}
                   onSaveRooms={async (payload) => {
                     await withErrorCatch(async () => {
                       const res = await saumApi.saveRooms(payload);
@@ -607,6 +610,10 @@ export default function App() {
                     });
                   }}
                   onSavePreset={handleSavePaperPreset}
+                  onOpenFacilityManager={(roomId) => {
+                    setRuangSesiTab('fasilitas');
+                    navigateTo('ruang_sesi', undefined, roomId);
+                  }}
                 />
               )}
 

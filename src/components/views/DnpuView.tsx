@@ -742,16 +742,16 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
               />
             </div>
             <div>
-              <label className="block font-semibold text-slate-600 mb-1">Kapasitas / Ruang (Maks 24)</label>
+              <label className="block font-semibold text-slate-600 mb-1">Kapasitas / Ruang (Ideal 22, Maks 23)</label>
               <input
                 type="number"
                 min={1}
-                max={24}
-                value={localRoomConfig.kapasitasPerRuang}
+                max={23}
+                value={Math.min(23, localRoomConfig.kapasitasPerRuang || 22)}
                 onChange={(e) =>
                   setLocalRoomConfig({
                     ...localRoomConfig,
-                    kapasitasPerRuang: Math.min(24, Math.max(1, Number(e.target.value) || 22)),
+                    kapasitasPerRuang: Math.min(23, Math.max(1, Number(e.target.value) || 22)),
                   })
                 }
                 className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-mono tabular-nums"

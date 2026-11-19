@@ -180,7 +180,7 @@ export function validateParticipantNumbers(students: Student[]): {
   };
 }
 
-const READABLE_PASSWORD_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const READABLE_PASSWORD_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
 export function createReadablePassword(length = 6): string {
   const safeLen = Math.max(4, Math.min(12, length));

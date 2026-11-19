@@ -188,7 +188,7 @@ export interface ExamRoom {
   id: string;
   nomorRuang: string; // "01", "02", etc.
   namaRuang: string; // "Ruang 01"
-  kapasitas: number; // ideal max 22
+  kapasitas: number; // ideal 22, incidental max 23 (+ kursi tambahan)
   jumlahBaris: number;
   jumlahKolom: number;
   polaTempatDuduk: SeatingPattern;
@@ -197,6 +197,15 @@ export interface ExamRoom {
   pengawas1Id?: string;
   pengawas2Id?: string;
   isLocked?: boolean;
+  // Manajemen Meja & Kursi dan Edit Denah
+  mejaAwal?: number;
+  kursiAwal?: number;
+  mejaTambahan?: number;
+  kursiTambahan?: number;
+  statusFasilitas?: 'NORMAL' | 'INSIDENTAL';
+  keteranganFasilitas?: string;
+  jarakAntarMeja?: 'rapat' | 'standar' | 'renggang';
+  incidentalSeatNo?: number;
 }
 
 // Physical Classroom Location Mapping (Denah Lokasi)
@@ -242,6 +251,7 @@ export interface RoomDistributionConfig {
   kapasitasPerRuang: number;
   metode: 'nomor_peserta' | 'seimbang_gender' | 'silang_kelas' | 'silang_jenjang_11_11';
   jumlahRuangManual?: number;
+  allowIncidental23?: boolean;
 }
 
 export interface SealDocConfig {

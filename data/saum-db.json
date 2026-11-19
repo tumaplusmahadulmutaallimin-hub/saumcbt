@@ -263,7 +263,7 @@
       "paperSize": "A4",
       "marginMm": 10,
       "isFinalized": false,
-      "updatedAt": "2026-11-19T17:00:57.395Z"
+      "updatedAt": "2026-11-19T17:23:09.751Z"
     },
     {
       "id": "tatib-pengawas",
@@ -279,7 +279,7 @@
       "paperSize": "A4",
       "marginMm": 10,
       "isFinalized": false,
-      "updatedAt": "2026-11-19T17:00:57.395Z"
+      "updatedAt": "2026-11-19T17:23:09.751Z"
     }
   ],
   "phoneRecords": [],
@@ -337,8 +337,8 @@
   ],
   "auditLogs": [
     {
-      "id": "log-1795107671093-n44u",
-      "timestamp": "2026-11-19T17:01:11.093Z",
+      "id": "log-1795109049854-vyu0",
+      "timestamp": "2026-11-19T17:24:09.854Z",
       "actor": "Arif Syaifudin, S.H",
       "role": "Super Admin",
       "module": "pengaturan",
@@ -347,7 +347,7 @@
     },
     {
       "id": "log-init",
-      "timestamp": "2026-11-19T17:01:11.093Z",
+      "timestamp": "2026-11-19T17:24:09.854Z",
       "actor": "Arif Syaifudin, S.H",
       "role": "Super Admin",
       "module": "system",
