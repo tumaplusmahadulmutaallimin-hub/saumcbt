@@ -10,6 +10,7 @@ import {
 import { KopSurat } from './KopSurat';
 import { SimpleQRCode, formatIndonesianDate } from '../../utils/qrBarcode';
 import { getCardGridMetrics, getSheetScreenStyle } from '../../utils/printLayout';
+import { formatPersonNameAndTitle } from '../../utils/formatName';
 
 export type NomorMejaPrintStyle =
   | 'label_lengkap'
@@ -51,8 +52,8 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
 
   const metrics = getCardGridMetrics(paperPreset, {
     defaultSize: 'F4',
-    defaultCardsPerPage: cardsPerPage || 6,
-    gapMm: 4,
+    defaultCardsPerPage: cardsPerPage || paperPreset?.cardsPerPage || 6,
+    gapMm: 3,
   });
   const sheetStyle = getSheetScreenStyle(metrics.resolved);
 
@@ -187,15 +188,15 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
                                       {slot.st.nomorPeserta || '-'}
                                     </span>
                                   </div>
-                                  <p className="text-[9.5px] font-extrabold uppercase text-slate-950 truncate">
+                                  <p className="text-[10px] font-extrabold text-slate-950 truncate">
                                     {slot.st.nama}
                                   </p>
                                   <p className="text-[8px] text-slate-700 font-semibold">
-                                    Kelas {slot.st.kelas} ({slot.st.jenisKelamin}) • NIS {slot.st.nis || '-'}
+                                    Kelas {slot.st.kelas} ({slot.st.jenisKelamin}) &bull; NIS {slot.st.nis || '-'}
                                   </p>
                                   {slot.st.usernameUjian && (
                                     <p className="text-[7.5px] font-mono text-emerald-950 font-bold truncate">
-                                      User: {slot.st.usernameUjian} • Pass: {slot.st.passwordUjian || '-'}
+                                      User: {slot.st.usernameUjian} &bull; Pass: {slot.st.passwordUjian || '-'}
                                     </p>
                                   )}
                                 </div>
@@ -204,12 +205,12 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
                                     <img
                                       src={uploadedBarcode}
                                       alt="Barcode"
-                                      className="h-9 max-w-[54px] object-contain bg-white border border-slate-200 rounded p-0.5"
+                                      className="h-12 max-w-[70px] object-contain bg-white border border-slate-200 rounded p-0.5"
                                     />
                                   ) : (
                                     <SimpleQRCode
                                       value={link || `${slot.st.nomorPeserta}|${slot.st.nama}|Kursi-${seatNo}`}
-                                      size={38}
+                                      size={48}
                                     />
                                   )}
                                 </div>
@@ -238,7 +239,7 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
     const chunkSize = 6;
     const gridMetrics = getCardGridMetrics(
       { ...metrics.resolved, cardsPerPage: 6 },
-      { defaultSize: 'F4', defaultCardsPerPage: 6, gapMm: 4 }
+      { defaultSize: 'F4', defaultCardsPerPage: 6, gapMm: 3 }
     );
     const pages: Student[][] = [];
     for (let i = 0; i < filteredStudents.length; i += chunkSize) {
@@ -255,7 +256,7 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
               pageIdx < pages.length - 1 ? 'print-page-break mb-8 print:mb-0' : ''
             }`}
           >
-            <div className="grid grid-cols-2 gap-[4mm]">
+            <div className="grid grid-cols-2 grid-rows-3 gap-[3mm]">
               {pageStudents.map((st, idx) => {
                 const room = st.ruangId ? roomMap.get(st.ruangId) : undefined;
                 const seatNum = st.nomorMeja || idx + 1;
@@ -293,7 +294,7 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
                     </div>
 
                     <div className="border-t border-slate-300 pt-2 text-[9px] space-y-0.5">
-                      <p className="font-extrabold text-slate-950 uppercase truncate text-[10px]">{st.nama}</p>
+                      <p className="font-extrabold text-slate-950 truncate text-[10.5px]">{st.nama}</p>
                       <p className="font-mono font-bold text-emerald-900">
                         No. Peserta: {st.nomorPeserta || '-'} • Kelas {st.kelas}
                       </p>
@@ -369,7 +370,7 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
                     <td className="border border-slate-900 px-2 py-1 text-center font-mono">
                       {st.passwordUjian || '-'}
                     </td>
-                    <td className="border border-slate-900 px-2 py-1 font-semibold uppercase">{st.nama}</td>
+                    <td className="border border-slate-900 px-2 py-1 font-semibold">{st.nama}</td>
                     <td className="border border-slate-900 px-1.5 py-1 text-center">{st.kelas}</td>
                     <td className="border border-slate-900 px-2 py-1 text-center">
                       {room ? room.namaRuang : '-'}
@@ -393,8 +394,8 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
               </p>
               <p className="font-bold">Ketua Panitia Ujian,</p>
               <div className="h-14" />
-              <p className="font-bold underline uppercase">
-                {profile.namaKetuaPanitia || profile.namaKepala || '.........................'}
+              <p className="font-bold underline">
+                {formatPersonNameAndTitle(profile.namaKetuaPanitia || profile.namaKepala) || '.........................'}
               </p>
               <p className="text-[9.5px] font-sans">
                 NIP. {profile.nipKetuaPanitia || profile.nipKepala || '-'}
@@ -423,7 +424,7 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
             pageIdx < pages.length - 1 ? 'print-page-break mb-8 print:mb-0' : ''
           }`}
         >
-          <div className="grid grid-cols-2 gap-[4mm]">
+          <div className={`grid grid-cols-2 ${chunkSize === 6 ? 'grid-rows-3' : 'grid-rows-2'} gap-[3mm]`}>
             {pageStudents.map((st) => {
               const room = st.ruangId ? roomMap.get(st.ruangId) : undefined;
               const uploadedBarcode = st.barcodeUrl || numberingConfig?.uploadedBarcodeUrl;
@@ -437,16 +438,16 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
                 <div
                   key={st.id}
                   data-testid="nomor-meja-card"
-                  className="border-2 border-dashed border-slate-800 rounded-lg p-3 bg-white flex flex-col justify-between print-avoid-break overflow-hidden"
+                  className="border-2 border-dashed border-slate-800 rounded-lg p-2.5 bg-white flex flex-col justify-between print-avoid-break overflow-hidden"
                   style={{ height: `${metrics.cardHeightMm}mm` }}
                 >
-                  <div className="border-b-2 border-emerald-800 pb-1.5 flex items-center justify-between gap-2">
+                  <div className="border-b-2 border-emerald-800 pb-1 flex items-center justify-between gap-2">
                     <div className="min-w-0">
                       <p className="text-[8px] font-bold text-slate-500 uppercase truncate">
                         {profile.namaMadrasah || 'MADRASAH'}
                       </p>
                       <h4 className="text-[10.5px] font-extrabold text-emerald-900 uppercase leading-tight">
-                        NOMOR MEJA & KURSI UJIAN
+                        NOMOR MEJA &amp; KURSI UJIAN
                       </h4>
                     </div>
                     <div className="bg-emerald-800 text-white font-mono font-extrabold text-[12px] px-2.5 py-1 rounded shrink-0 text-center">
@@ -454,12 +455,12 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 my-auto py-1.5">
+                  <div className="flex items-center gap-2.5 my-auto py-1">
                     <div className="flex-1 min-w-0 space-y-1">
-                      <div className="text-[13px] font-black font-mono tracking-wider text-slate-950 bg-slate-100 px-2 py-1 rounded border border-slate-300">
+                      <div className="text-[13px] font-black font-mono tracking-wider text-slate-950 bg-slate-100 px-2 py-0.5 rounded border border-slate-300">
                         {st.nomorPeserta || '-'}
                       </div>
-                      <p className="text-[11px] font-extrabold uppercase text-slate-950 truncate pt-0.5">
+                      <p className="text-[11.5px] font-extrabold text-slate-950 truncate pt-0.5">
                         {st.nama}
                       </p>
                       <p className="text-[8.5px] text-slate-700 font-mono">
@@ -468,8 +469,8 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
                       <p className="text-[8.5px] text-slate-700 truncate">
                         TTL: {st.tempatLahir || '-'}, {formatIndonesianDate(st.tanggalLahir)}
                       </p>
-                      <p className="text-[9px] text-slate-700 font-semibold">
-                        Kelas: <b className="text-slate-950">{st.kelas}</b> ({st.jenisKelamin}) •{' '}
+                      <p className="text-[9.5px] text-slate-700 font-semibold">
+                        Kelas: <b className="text-slate-950">{st.kelas}</b> ({st.jenisKelamin}) &bull;{' '}
                         <span className="text-emerald-900 font-extrabold">
                           {room ? room.namaRuang : '-'}
                           {isOnline || st.sesi ? ` / Sesi ${st.sesi || 1}` : ''}
@@ -490,7 +491,7 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
                         <img
                           src={uploadedBarcode}
                           alt={`Barcode ${st.nomorPeserta || st.nama}`}
-                          className="h-[58px] max-w-[86px] object-contain border border-slate-200 rounded p-0.5 bg-white"
+                          className="h-[72px] max-w-[96px] object-contain border border-slate-200 rounded p-0.5 bg-white"
                         />
                       ) : (
                         <SimpleQRCode
@@ -498,7 +499,7 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
                             effectiveLink ||
                             `${st.nomorPeserta}|${st.nama}|${st.kelas}|Meja-${deskText}`
                           }
-                          size={58}
+                          size={72}
                         />
                       )}
                       <span className="text-[7.5px] font-mono text-slate-600 font-bold mt-1">
@@ -507,7 +508,7 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
                     </div>
                   </div>
 
-                  <div className="border-t border-slate-200 pt-1.5 flex justify-between items-center text-[7.5px] text-slate-500">
+                  <div className="border-t border-slate-200 pt-1 flex justify-between items-center text-[7.5px] text-slate-500">
                     <span className="font-semibold truncate">
                       {examConfig?.namaUjian || profile.jenisUjian || 'Ujian Madrasah'} • TP{' '}
                       {profile.tahunPelajaran || '-'}

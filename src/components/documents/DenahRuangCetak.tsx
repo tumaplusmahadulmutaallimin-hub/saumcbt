@@ -4,6 +4,7 @@ import { KopSurat } from './KopSurat';
 import { computeClassRangesInRoom } from '../../utils/seating';
 import { formatIndonesianDate } from '../../utils/qrBarcode';
 import { getSheetScreenStyle } from '../../utils/printLayout';
+import { formatPersonNameAndTitle } from '../../utils/formatName';
 
 interface DenahRuangCetakProps {
   profile: MadrasahProfile;
@@ -74,8 +75,8 @@ export const DenahRuangCetak: React.FC<DenahRuangCetakProps> = ({
           const classRanges = computeClassRangesInRoom(roomStudents, students);
           const maleCount = roomStudents.filter((s) => s.jenisKelamin === 'L').length;
           const femaleCount = roomStudents.filter((s) => s.jenisKelamin === 'P').length;
-          const p1 = room.pengawas1Id ? supervisorMap.get(room.pengawas1Id)?.nama : undefined;
-          const p2 = room.pengawas2Id ? supervisorMap.get(room.pengawas2Id)?.nama : undefined;
+          const p1 = room.pengawas1Id ? formatPersonNameAndTitle(supervisorMap.get(room.pengawas1Id)?.nama) : undefined;
+          const p2 = room.pengawas2Id ? formatPersonNameAndTitle(supervisorMap.get(room.pengawas2Id)?.nama) : undefined;
 
           // Build rows of 6 seats: [col 0, col 1] [GAP] [col 2, col 3] [GAP] [col 4, col 5]
           // ONLY occupied seats are rendered (no empty boxes!). Any missing trailing slot renders blank space.
@@ -108,8 +109,8 @@ export const DenahRuangCetak: React.FC<DenahRuangCetakProps> = ({
                     DENAH TEMPAT DUDUK PESERTA UJIAN
                   </h2>
                   <p className="text-xs font-bold uppercase mt-0.5">
-                    RUANG {room.nomorRuang} ({room.namaRuang.toUpperCase()})
-                    {sesi ? ` • SESI ${sesi}` : ''} — {profile.jenisUjian.toUpperCase()}
+                    RUANG {room.nomorRuang} ({(room.namaRuang || '').toUpperCase()})
+                    {sesi ? ` • SESI ${sesi}` : ''} — {(profile.jenisUjian || 'UJIAN MADRASAH').toUpperCase()}
                   </p>
                   <p className="text-[10.5px] text-slate-700">
                     Tahun Pelajaran {profile.tahunPelajaran} • Jumlah Peserta: {roomStudents.length} Orang
@@ -183,8 +184,8 @@ export const DenahRuangCetak: React.FC<DenahRuangCetakProps> = ({
                             </div>
 
                             {/* Bottom: Nama Lengkap wrapping cleanly */}
-                            <div className="text-[9px] font-bold text-slate-900 uppercase text-center leading-tight break-words">
-                              {st.nama}
+                            <div className="text-[9px] font-bold text-slate-900 text-center leading-tight break-words">
+                              {formatPersonNameAndTitle(st.nama)}
                             </div>
                           </div>
                         );
@@ -236,9 +237,17 @@ export const DenahRuangCetak: React.FC<DenahRuangCetakProps> = ({
                     {formatIndonesianDate(profile.tanggalSurat)}
                   </p>
                   <p className="font-bold">Kepala Madrasah,</p>
-                  <div className="h-10" />
-                  <p className="font-bold underline uppercase">
-                    {profile.namaKepala || '.........................'}
+                  <div className="h-10 flex items-center justify-center">
+                    {profile.ttdKepalaUrl && (
+                      <img
+                        src={profile.ttdKepalaUrl}
+                        alt="TTD Kepala Madrasah"
+                        className="max-h-10 max-w-[120px] object-contain mx-auto"
+                      />
+                    )}
+                  </div>
+                  <p className="font-bold underline">
+                    {formatPersonNameAndTitle(profile.namaKepala) || '.........................'}
                   </p>
                   <p className="text-[9.5px] font-sans">NIP. {profile.nipKepala || '-'}</p>
                 </div>

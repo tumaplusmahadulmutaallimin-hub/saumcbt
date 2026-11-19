@@ -3,6 +3,7 @@ import { MadrasahProfile, PaperPreset, TataTertibDoc } from '../../types';
 import { KopSurat } from './KopSurat';
 import { formatIndonesianDate } from '../../utils/qrBarcode';
 import { getSheetScreenStyle } from '../../utils/printLayout';
+import { formatPersonNameAndTitle } from '../../utils/formatName';
 
 interface TataTertibProps {
   profile: MadrasahProfile;
@@ -84,9 +85,17 @@ export const TataTertib: React.FC<TataTertibProps> = ({
                   {formatIndonesianDate(profile.tanggalSurat)}
                 </p>
                 <p className="font-bold">Kepala Madrasah,</p>
-                <div className="h-14" />
-                <p className="font-bold underline uppercase">
-                  {profile.namaKepala || '.........................'}
+                <div className="h-14 flex items-center justify-center">
+                  {profile.ttdKepalaUrl && (
+                    <img
+                      src={profile.ttdKepalaUrl}
+                      alt="TTD Kepala Madrasah"
+                      className="max-h-14 max-w-[140px] object-contain mx-auto"
+                    />
+                  )}
+                </div>
+                <p className="font-bold underline">
+                  {formatPersonNameAndTitle(profile.namaKepala) || '.........................'}
                 </p>
                 <p className="text-[10px] font-sans">NIP. {profile.nipKepala || '-'}</p>
               </div>

@@ -9,6 +9,7 @@ import {
 import { KopSurat } from './KopSurat';
 import { formatIndonesianDate } from '../../utils/qrBarcode';
 import { getSheetScreenStyle } from '../../utils/printLayout';
+import { formatPersonNameAndTitle } from '../../utils/formatName';
 
 interface HpDocumentsCetakProps {
   profile: MadrasahProfile;
@@ -121,7 +122,7 @@ export const HpDocumentsCetak: React.FC<HpDocumentsCetakProps> = ({
                     )}
                   </td>
                   <td className="border border-slate-900 px-2 py-2">
-                    <span className="font-bold uppercase">{hp.namaSantri}</span> ({hp.kelas})
+                    <span className="font-bold">{formatPersonNameAndTitle(hp.namaSantri)}</span> ({hp.kelas})
                   </td>
                   <td className="border border-slate-900 px-2 py-2 text-center font-mono">
                     {isBlankSheet ? '' : hp.nomorBox || hp.nomorSlot ? `${hp.nomorBox || ''} / ${hp.nomorSlot || ''}` : ''}
@@ -208,7 +209,7 @@ export const HpDocumentsCetak: React.FC<HpDocumentsCetakProps> = ({
                     )}
                   </td>
                   <td className="border border-slate-900 px-2 py-2">
-                    <div className="font-bold uppercase">{hp.namaSantri}</div>
+                    <div className="font-bold">{formatPersonNameAndTitle(hp.namaSantri)}</div>
                     <div className="text-[9px] text-slate-600">Kelas {hp.kelas}</div>
                   </td>
                   <td className="border border-slate-900 px-2 py-2">
@@ -256,8 +257,8 @@ export const HpDocumentsCetak: React.FC<HpDocumentsCetakProps> = ({
             <p className="font-bold">Mengetahui,</p>
             <p className="font-bold">Ketua Panitia Ujian,</p>
             <div className="h-14" />
-            <p className="font-bold underline uppercase">
-              {profile.namaKetuaPanitia || profile.namaKepala || '.........................'}
+            <p className="font-bold underline">
+              {formatPersonNameAndTitle(profile.namaKetuaPanitia || profile.namaKepala) || '.........................'}
             </p>
             <p className="text-[9.5px] font-sans">NIP. {profile.nipKetuaPanitia || '-'}</p>
           </div>

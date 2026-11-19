@@ -10,6 +10,7 @@ import {
 import { KopSurat } from './KopSurat';
 import { SimpleBarcode, SimpleQRCode, formatIndonesianDate } from '../../utils/qrBarcode';
 import { getCardGridMetrics, getSheetScreenStyle } from '../../utils/printLayout';
+import { formatPersonNameAndTitle } from '../../utils/formatName';
 
 interface KartuPesertaProps {
   profile: MadrasahProfile;
@@ -21,6 +22,7 @@ interface KartuPesertaProps {
   selectedStudentId?: string;
   paperPreset?: PaperPreset;
   cardsPerPage?: 4 | 6;
+  onRequestUploadTtdKepala?: () => void;
 }
 
 export const KartuPeserta: React.FC<KartuPesertaProps> = ({
@@ -33,6 +35,7 @@ export const KartuPeserta: React.FC<KartuPesertaProps> = ({
   selectedStudentId,
   paperPreset,
   cardsPerPage,
+  onRequestUploadTtdKepala,
 }) => {
   let filtered = students.filter((s) => s.status === 'Aktif');
   if (selectedRoomId && selectedRoomId !== 'all') {
@@ -44,8 +47,8 @@ export const KartuPeserta: React.FC<KartuPesertaProps> = ({
 
   const metrics = getCardGridMetrics(paperPreset, {
     defaultSize: 'F4',
-    defaultCardsPerPage: cardsPerPage || (paperPreset?.size === 'A4' ? 4 : 6),
-    gapMm: 4,
+    defaultCardsPerPage: cardsPerPage || paperPreset?.cardsPerPage || 6,
+    gapMm: 3,
   });
 
   const chunkSize = metrics.cardsPerPage;
@@ -58,6 +61,7 @@ export const KartuPeserta: React.FC<KartuPesertaProps> = ({
   const roomMap = new Map(rooms.map((r) => [r.id, r]));
   const barcodeMode = numberingConfig?.barcodeMode || 'auto';
   const showDeskNumber = numberingConfig?.showDeskNumber ?? true;
+  const formattedKepala = formatPersonNameAndTitle(profile.namaKepala) || '.........................';
 
   if (filtered.length === 0) {
     return (
@@ -81,7 +85,7 @@ export const KartuPeserta: React.FC<KartuPesertaProps> = ({
             pageIdx < pages.length - 1 ? 'print-page-break mb-8 print:mb-0' : ''
           }`}
         >
-          <div className="grid grid-cols-2 gap-[4mm]">
+          <div className={`grid grid-cols-2 ${isDense6 ? 'grid-rows-3' : 'grid-rows-2'} gap-[3mm]`}>
             {pageStudents.map((st) => {
               const room = st.ruangId ? roomMap.get(st.ruangId) : undefined;
               const uploadedBarcode = st.barcodeUrl || numberingConfig?.uploadedBarcodeUrl;
@@ -94,14 +98,14 @@ export const KartuPeserta: React.FC<KartuPesertaProps> = ({
                   key={st.id}
                   data-testid="kartu-peserta-card"
                   className={`border-2 border-emerald-800 rounded-lg ${
-                    isDense6 ? 'p-2.5' : 'p-3.5'
+                    isDense6 ? 'p-2' : 'p-3'
                   } flex flex-col justify-between bg-white relative print:border-emerald-900 print-avoid-break overflow-hidden`}
                   style={{ height: `${metrics.cardHeightMm}mm` }}
                 >
-                  <div className="absolute top-1 left-1 w-2 h-2 border-t-2 border-l-2 border-emerald-800" />
-                  <div className="absolute top-1 right-1 w-2 h-2 border-t-2 border-r-2 border-emerald-800" />
-                  <div className="absolute bottom-1 left-1 w-2 h-2 border-b-2 border-l-2 border-emerald-800" />
-                  <div className="absolute bottom-1 right-1 w-2 h-2 border-b-2 border-r-2 border-emerald-800" />
+                  <div className="absolute top-1 left-1 w-1.5 h-1.5 border-t-2 border-l-2 border-emerald-800" />
+                  <div className="absolute top-1 right-1 w-1.5 h-1.5 border-t-2 border-r-2 border-emerald-800" />
+                  <div className="absolute bottom-1 left-1 w-1.5 h-1.5 border-b-2 border-l-2 border-emerald-800" />
+                  <div className="absolute bottom-1 right-1 w-1.5 h-1.5 border-b-2 border-r-2 border-emerald-800" />
 
                   <div>
                     <KopSurat profile={profile} isCompact={true} />
@@ -109,13 +113,13 @@ export const KartuPeserta: React.FC<KartuPesertaProps> = ({
                       <div className="text-left min-w-0">
                         <h2
                           className={`${
-                            isDense6 ? 'text-[10px]' : 'text-[11px]'
+                            isDense6 ? 'text-[10.5px]' : 'text-[11.5px]'
                           } font-extrabold uppercase tracking-wider text-emerald-950 font-serif leading-tight`}
                         >
                           KARTU PESERTA UJIAN
                         </h2>
                         <p className="text-[8px] font-bold text-slate-800 truncate">
-                          {(examConfig?.namaUjian || profile.jenisUjian || 'UJIAN MADRASAH').toUpperCase()} • TP{' '}
+                          {(examConfig?.namaUjian || profile.jenisUjian || 'UJIAN MADRASAH').toUpperCase()} &bull; TP{' '}
                           {profile.tahunPelajaran || '-'}
                         </p>
                       </div>
@@ -127,12 +131,12 @@ export const KartuPeserta: React.FC<KartuPesertaProps> = ({
                       )}
                     </div>
 
-                    <div className={`flex ${isDense6 ? 'gap-2 mt-1.5' : 'gap-2.5 mt-2'}`}>
-                      {/* Photo & Barcode Box */}
+                    <div className={`flex ${isDense6 ? 'gap-2 mt-1' : 'gap-2.5 mt-1.5'} items-start`}>
+                      {/* Compact Photo Frame */}
                       <div className="flex-shrink-0 flex flex-col items-center">
                         <div
                           className={`${
-                            isDense6 ? 'w-[20mm] h-[25mm]' : 'w-[24mm] h-[32mm]'
+                            isDense6 ? 'w-[20mm] h-[25.5mm]' : 'w-[23mm] h-[30mm]'
                           } border border-slate-400 bg-slate-50 flex flex-col items-center justify-center p-1 relative rounded-xs`}
                         >
                           {st.fotoUrl ? (
@@ -152,41 +156,9 @@ export const KartuPeserta: React.FC<KartuPesertaProps> = ({
                               </div>
                             </div>
                           )}
-                          <div className="absolute -bottom-1.5 -right-1.5 w-9 h-9 rounded-full border border-purple-600/40 text-purple-700/50 flex items-center justify-center text-[5px] font-bold rotate-[-20deg] select-none pointer-events-none uppercase">
+                          <div className="absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-full border border-purple-600/40 text-purple-700/50 flex items-center justify-center text-[5px] font-bold rotate-[-20deg] select-none pointer-events-none uppercase">
                             Cap Madrasah
                           </div>
-                        </div>
-
-                        {/* Barcode / Uploaded Image / QR under photo */}
-                        <div className={`${isDense6 ? 'mt-1' : 'mt-2'} text-center`}>
-                          {st.barcodeUrl || (barcodeMode === 'uploaded' && uploadedBarcode) ? (
-                            <div className="flex flex-col items-center">
-                              <img
-                                src={uploadedBarcode}
-                                alt={`Barcode ${st.nomorPeserta || st.nama}`}
-                                className="h-[22px] max-w-[84px] object-contain"
-                              />
-                              <span className="font-mono text-[8px] tracking-wider text-slate-800 font-bold mt-0.5">
-                                {st.nomorPeserta || '-'}
-                              </span>
-                            </div>
-                          ) : barcodeMode === 'link_qr' ? (
-                            <div className="flex flex-col items-center">
-                              <SimpleQRCode
-                                value={effectiveLink || st.nomorPeserta || st.nisn}
-                                size={isDense6 ? 34 : 42}
-                              />
-                              <span className="font-mono text-[7.5px] text-slate-800 font-bold mt-0.5">
-                                {st.nomorPeserta || '-'}
-                              </span>
-                            </div>
-                          ) : (
-                            <SimpleBarcode
-                              value={st.nomorPeserta || '26-01-000'}
-                              height={isDense6 ? 18 : 24}
-                              width={isDense6 ? 82 : 92}
-                            />
-                          )}
                         </div>
                       </div>
 
@@ -197,40 +169,40 @@ export const KartuPeserta: React.FC<KartuPesertaProps> = ({
                         } leading-tight min-w-0`}
                       >
                         <div className="flex">
-                          <span className="w-20 font-bold text-slate-700 shrink-0">No. Peserta</span>
+                          <span className="w-[74px] font-bold text-slate-700 shrink-0">No. Peserta</span>
                           <span className="mr-1">:</span>
                           <span className="font-extrabold text-emerald-900 font-mono text-[10px]">
                             {st.nomorPeserta || '-'}
                           </span>
                         </div>
                         <div className="flex">
-                          <span className="w-20 font-bold text-slate-700 shrink-0">NIS / NISN</span>
+                          <span className="w-[74px] font-bold text-slate-700 shrink-0">NIS / NISN</span>
                           <span className="mr-1">:</span>
                           <span className="font-semibold text-slate-900 font-mono truncate">
                             {st.nis || '-'} / {st.nisn || '-'}
                           </span>
                         </div>
                         <div className="flex">
-                          <span className="w-20 font-bold text-slate-700 shrink-0">Nama</span>
+                          <span className="w-[74px] font-bold text-slate-700 shrink-0">Nama</span>
                           <span className="mr-1">:</span>
-                          <span className="font-bold text-slate-900 uppercase truncate">{st.nama}</span>
+                          <span className="font-bold text-slate-950 truncate">{st.nama}</span>
                         </div>
                         <div className="flex">
-                          <span className="w-20 font-bold text-slate-700 shrink-0">TTL</span>
+                          <span className="w-[74px] font-bold text-slate-700 shrink-0">TTL</span>
                           <span className="mr-1">:</span>
                           <span className="text-slate-800 truncate">
                             {st.tempatLahir || '-'}, {formatIndonesianDate(st.tanggalLahir)}
                           </span>
                         </div>
                         <div className="flex">
-                          <span className="w-20 font-bold text-slate-700 shrink-0">Kelas / JK</span>
+                          <span className="w-[74px] font-bold text-slate-700 shrink-0">Kelas / JK</span>
                           <span className="mr-1">:</span>
                           <span className="font-bold text-slate-900 truncate">
                             {st.kelas} ({st.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan'})
                           </span>
                         </div>
                         <div className="flex">
-                          <span className="w-20 font-bold text-slate-700 shrink-0">
+                          <span className="w-[74px] font-bold text-slate-700 shrink-0">
                             {showDeskNumber ? 'Ruang / Meja' : 'Ruang'}
                           </span>
                           <span className="mr-1">:</span>
@@ -241,16 +213,16 @@ export const KartuPeserta: React.FC<KartuPesertaProps> = ({
                           </span>
                         </div>
                         <div className="flex items-center bg-emerald-50/90 print:bg-slate-100 border border-emerald-200 print:border-slate-400 rounded px-1.5 py-0.5 mt-0.5">
-                          <span className="font-bold text-emerald-950 shrink-0 mr-1.5">Login Ujian:</span>
-                          <span className="font-mono font-bold text-slate-900 truncate">
+                          <span className="font-bold text-emerald-950 shrink-0 mr-1">Login:</span>
+                          <span className="font-mono font-bold text-slate-900 truncate text-[8px]">
                             User: {st.usernameUjian || '-'} &bull; Pass: {st.passwordUjian || '-'}
                           </span>
                         </div>
                         {effectiveLink && (
-                          <div className="flex pt-0.5">
-                            <span className="w-20 font-bold text-slate-700 shrink-0">Link Ujian</span>
+                          <div className="flex">
+                            <span className="w-[74px] font-bold text-slate-700 shrink-0">Link Ujian</span>
                             <span className="mr-1">:</span>
-                            <span className="font-mono text-[7.5px] text-slate-900 break-all line-clamp-1">
+                            <span className="font-mono text-[7.5px] text-slate-900 truncate">
                               {effectiveLink}
                             </span>
                           </div>
@@ -259,24 +231,81 @@ export const KartuPeserta: React.FC<KartuPesertaProps> = ({
                     </div>
                   </div>
 
-                  {/* Card Footer */}
-                  <div className="mt-1 pt-1 border-t border-slate-200 flex justify-between items-end text-[8px]">
-                    <div className="text-[7px] text-slate-500 max-w-[48%] leading-tight italic">
-                      * Kartu harap dibawa selama pelaksanaan ujian dan diletakkan di sudut meja.
+                  {/* Card Footer: Enlarged Barcode on Left + Kepala Madrasah TTD on Right */}
+                  <div className="mt-1 pt-1 border-t border-slate-200 flex justify-between items-end gap-2 text-[8px]">
+                    <div
+                      data-testid="kartu-barcode-container"
+                      className="flex flex-col items-start justify-end min-w-0 max-w-[52%]"
+                    >
+                      {st.barcodeUrl || (barcodeMode === 'uploaded' && uploadedBarcode) ? (
+                        <div className="flex flex-col items-center">
+                          <img
+                            src={uploadedBarcode}
+                            alt={`Barcode ${st.nomorPeserta || st.nama}`}
+                            className="h-[34px] max-w-[144px] object-contain"
+                          />
+                          <span className="font-mono text-[8px] tracking-wider text-slate-800 font-bold leading-none mt-0.5">
+                            {st.nomorPeserta || '-'}
+                          </span>
+                        </div>
+                      ) : barcodeMode === 'link_qr' ? (
+                        <div className="flex items-center gap-1.5">
+                          <SimpleQRCode
+                            value={effectiveLink || st.nomorPeserta || st.nisn}
+                            size={isDense6 ? 40 : 48}
+                          />
+                          <div className="text-[7px] leading-tight text-slate-600 min-w-0">
+                            <span className="font-mono font-bold text-slate-900 block">
+                              {st.nomorPeserta || '-'}
+                            </span>
+                            <span>Scan Kartu</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <SimpleBarcode
+                          value={st.nomorPeserta || '26-01-000'}
+                          height={isDense6 ? 30 : 34}
+                          width={isDense6 ? 146 : 162}
+                        />
+                      )}
                     </div>
-                    <div className="text-center font-serif leading-tight">
-                      <p>
+
+                    <div className="text-center font-serif leading-tight shrink-0 min-w-[115px]">
+                      <p className="text-[7.5px]">
                         {profile.tempatTandaTangan ? `${profile.tempatTandaTangan}, ` : ''}
                         {formatIndonesianDate(profile.tanggalSurat)}
                       </p>
-                      <p className="font-bold">Kepala Madrasah,</p>
-                      <div className={isDense6 ? 'h-5 flex items-center justify-center' : 'h-8 flex items-center justify-center'}>
-                        <span className="text-[7px] text-purple-700/50 italic font-sans font-bold">
-                          [ Ttd & Cap ]
-                        </span>
+                      <p className="font-bold text-[8px]">Kepala Madrasah,</p>
+                      <div
+                        className={`${
+                          isDense6 ? 'h-[26px]' : 'h-[32px]'
+                        } flex items-center justify-center my-0.5`}
+                      >
+                        {profile.ttdKepalaUrl ? (
+                          <img
+                            src={profile.ttdKepalaUrl}
+                            alt="TTD Kepala Madrasah"
+                            data-testid="ttd-kepala-img"
+                            className="max-h-full max-w-[92px] object-contain"
+                          />
+                        ) : onRequestUploadTtdKepala ? (
+                          <button
+                            type="button"
+                            onClick={onRequestUploadTtdKepala}
+                            data-testid="ttd-kepala-placeholder"
+                            className="no-print text-[7px] text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-dashed border-emerald-400 px-1.5 py-0.5 rounded font-sans font-semibold cursor-pointer"
+                            title="Klik untuk mengunggah file TTD Kepala Madrasah (JPG/PNG)"
+                          >
+                            + Upload TTD (JPG)
+                          </button>
+                        ) : (
+                          <span className="text-[7px] text-purple-700/50 italic font-sans font-bold">
+                            [ Ttd &amp; Cap ]
+                          </span>
+                        )}
                       </div>
-                      <p className="font-bold underline text-slate-950 uppercase">
-                        {profile.namaKepala || '.........................'}
+                      <p className="font-bold underline text-slate-950 text-[8.5px]">
+                        {formattedKepala}
                       </p>
                       <p className="text-[7px] font-sans">NIP. {profile.nipKepala || '-'}</p>
                     </div>

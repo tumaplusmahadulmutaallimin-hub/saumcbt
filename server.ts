@@ -389,6 +389,13 @@ async function startServer() {
     const db = loadDb();
     const nextConfig = req.body as ExamConfig;
     db.examConfig = nextConfig;
+    db.roomConfig = {
+      ...db.roomConfig,
+      jumlahRuangManual:
+        typeof nextConfig.jumlahRuang === 'number' && nextConfig.jumlahRuang >= 0
+          ? nextConfig.jumlahRuang
+          : db.roomConfig.jumlahRuangManual,
+    };
     // Sync exam name & tahun pelajaran into profile for 1-source consistency
     db.profile = {
       ...db.profile,
@@ -397,7 +404,7 @@ async function startServer() {
     };
     appendAudit(db, req.currentUser!, 'pengaturan_ujian', 'UPDATE_CONFIG', `Moda: ${nextConfig.moda}, Ruang: ${nextConfig.jumlahRuang}, Sesi: ${nextConfig.jumlahSesi}`);
     saveDb(db);
-    res.json({ examConfig: db.examConfig, profile: db.profile, auditLogs: db.auditLogs });
+    res.json({ examConfig: db.examConfig, profile: db.profile, roomConfig: db.roomConfig, auditLogs: db.auditLogs });
   });
 
   app.put('/api/students', requireAuth, requireModuleEdit('dnpu'), (req: AuthedRequest, res) => {
@@ -524,7 +531,13 @@ async function startServer() {
     createBackup(db, 'room-distribution');
     db.students = students;
     db.rooms = rooms;
-    db.roomConfig = roomConfig;
+    db.roomConfig = {
+      ...roomConfig,
+      jumlahRuangManual:
+        roomConfig?.jumlahRuangManual && roomConfig.jumlahRuangManual > 0
+          ? roomConfig.jumlahRuangManual
+          : rooms.length,
+    };
     db.examConfig.jumlahRuang = rooms.length;
     appendAudit(
       db,

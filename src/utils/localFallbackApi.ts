@@ -265,6 +265,13 @@ export const localFallbackApi = {
     const db = loadLocalDb();
     const user = requireLocalEdit(db, 'pengaturan_ujian');
     db.examConfig = examConfig;
+    db.roomConfig = {
+      ...db.roomConfig,
+      jumlahRuangManual:
+        typeof examConfig.jumlahRuang === 'number' && examConfig.jumlahRuang >= 0
+          ? examConfig.jumlahRuang
+          : db.roomConfig.jumlahRuangManual,
+    };
     db.profile = {
       ...db.profile,
       jenisUjian: examConfig.namaUjian || db.profile.jenisUjian,
@@ -278,7 +285,7 @@ export const localFallbackApi = {
       `Moda: ${examConfig.moda}, Ruang: ${examConfig.jumlahRuang}, Sesi: ${examConfig.jumlahSesi}`
     );
     saveLocalDb(db);
-    return { examConfig: db.examConfig, profile: db.profile, auditLogs: db.auditLogs };
+    return { examConfig: db.examConfig, profile: db.profile, roomConfig: db.roomConfig, auditLogs: db.auditLogs };
   },
 
   saveStudents: async (students: Student[], _backupReason?: string) => {
@@ -368,7 +375,13 @@ export const localFallbackApi = {
     const user = requireLocalEdit(db, 'ruang_sesi');
     db.students = payload.students;
     db.rooms = payload.rooms;
-    db.roomConfig = payload.roomConfig;
+    db.roomConfig = {
+      ...payload.roomConfig,
+      jumlahRuangManual:
+        payload.roomConfig?.jumlahRuangManual && payload.roomConfig.jumlahRuangManual > 0
+          ? payload.roomConfig.jumlahRuangManual
+          : payload.rooms.length,
+    };
     db.examConfig.jumlahRuang = payload.rooms.length;
     appendAudit(db, user, 'ruang_sesi', 'SAVE_ROOMS_SESSIONS', `Menyimpan pembagian ${payload.rooms.length} ruang ujian.`);
     saveLocalDb(db);

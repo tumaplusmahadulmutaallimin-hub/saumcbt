@@ -1,9 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  analyzeRoomParity,
   calculateRequiredRooms,
+  distributeRoomsCrossJenjang,
   distributeStudents,
   getOrderedSeats,
+  moveOddStudentsToReserveRoom,
 } from './seating';
 import { ExamRoom, Student } from '../types';
 
@@ -80,7 +83,122 @@ test('distributeStudents allocates students without exceeding room capacity', ()
   assert.equal(room1Students.every((s) => (s.nomorMeja || 0) >= 1 && (s.nomorMeja || 0) <= 15), true);
   assert.equal(room2Students.every((s) => (s.nomorMeja || 0) >= 1 && (s.nomorMeja || 0) <= 10), true);
 
-  // Check no overlaps
   const assignedIds = new Set(result.updatedStudents.map((s) => s.id));
   assert.equal(assignedIds.size, 25);
+});
+
+test('distributeRoomsCrossJenjang honors explicit jumlahRuang=4 even when jumlahRuangManual is 0 (via examJumlahRuang)', () => {
+  const mkStudents = (count: number, kelas: string, jenjang: string, offset: number): Student[] =>
+    Array.from({ length: count }, (_, i) => ({
+      id: `${jenjang}-${i + 1}`,
+      nis: `${offset + i}`,
+      nisn: `009000${String(offset + i).padStart(4, '0')}`,
+      nama: `Peserta ${jenjang} ${i + 1}`,
+      tempatLahir: 'Kota',
+      tanggalLahir: '2009-01-01',
+      jenisKelamin: i % 2 === 0 ? 'L' : 'P',
+      kelas,
+      jenjang,
+      nomorPeserta: `26-01-${String(offset + i).padStart(3, '0')}`,
+      status: 'Aktif',
+    }));
+
+  const students = [
+    ...mkStudents(30, 'X-A', 'X', 1),
+    ...mkStudents(30, 'XI-A', 'XI', 101),
+    ...mkStudents(20, 'XII-A', 'XII', 201),
+  ];
+
+  const res = distributeRoomsCrossJenjang(
+    students,
+    [],
+    { kapasitasPerRuang: 22, metode: 'silang_jenjang_11_11', jumlahRuangManual: 0 },
+    'kertas',
+    () => 0.42,
+    { examJumlahRuang: 4 }
+  );
+
+  assert.equal(res.updatedRooms.length, 4);
+  assert.equal(res.updatedStudents.length, 80);
+  // Zero same-jenjang desk mate conflicts
+  const parity = analyzeRoomParity(res.updatedStudents, res.updatedRooms, 'kertas', 1);
+  assert.equal(parity.sameJenjangDeskConflicts.length, 0);
+});
+
+test('distributeRoomsCrossJenjang puts 2-jenjang rooms first and 3-jenjang room at the end with zero desk conflicts', () => {
+  const mkStudents = (count: number, kelas: string, jenjang: string, offset: number): Student[] =>
+    Array.from({ length: count }, (_, i) => ({
+      id: `${jenjang}-${i + 1}`,
+      nis: `${offset + i}`,
+      nisn: `007000${String(offset + i).padStart(4, '0')}`,
+      nama: `Peserta ${jenjang} ${i + 1}`,
+      tempatLahir: 'Kota',
+      tanggalLahir: '2009-01-01',
+      jenisKelamin: i % 2 === 0 ? 'L' : 'P',
+      kelas,
+      jenjang,
+      nomorPeserta: `26-01-${String(offset + i).padStart(3, '0')}`,
+      status: 'Aktif',
+    }));
+
+  // Total 60 across 3 rooms (cap 20): X=27, XI=19, XII=14 -> forces 1 three-jenjang room
+  const students = [
+    ...mkStudents(27, 'X-A', 'X', 1),
+    ...mkStudents(19, 'XI-A', 'XI', 101),
+    ...mkStudents(14, 'XII-A', 'XII', 201),
+  ];
+
+  const res = distributeRoomsCrossJenjang(
+    students,
+    [],
+    { kapasitasPerRuang: 20, metode: 'silang_jenjang_11_11', jumlahRuangManual: 3 },
+    'kertas',
+    () => 0.35
+  );
+
+  assert.equal(res.updatedRooms.length, 3);
+  const distinctPerRoom = res.summary.map((s) => Object.keys(s.jenjangCounts).length);
+  assert.equal(distinctPerRoom[0], 2);
+  assert.equal(distinctPerRoom[1], 2);
+  assert.equal(distinctPerRoom[2], 3);
+
+  const parity = analyzeRoomParity(res.updatedStudents, res.updatedRooms, 'kertas', 1);
+  assert.equal(parity.sameJenjangDeskConflicts.length, 0);
+});
+
+test('analyzeRoomParity detects odd rooms and moveOddStudentsToReserveRoom places odd student into Ruang Cadangan', () => {
+  const mkStudents = (count: number, jenjang: string): Student[] =>
+    Array.from({ length: count }, (_, i) => ({
+      id: `${jenjang}-${i + 1}`,
+      nis: `${jenjang}-${i + 1}`,
+      nisn: `006000${jenjang}${String(i + 1).padStart(2, '0')}`,
+      nama: `Siswa ${jenjang} ${i + 1}`,
+      tempatLahir: 'Kota',
+      tanggalLahir: '2009-01-01',
+      jenisKelamin: 'L',
+      kelas: `${jenjang}-A`,
+      jenjang,
+      nomorPeserta: `26-${jenjang}-${String(i + 1).padStart(3, '0')}`,
+      status: 'Aktif',
+    }));
+
+  // 41 students in 2 rooms -> 21 + 20 -> 1 odd room
+  const students = [...mkStudents(21, 'X'), ...mkStudents(20, 'XI')];
+  const res = distributeRoomsCrossJenjang(
+    students,
+    [],
+    { kapasitasPerRuang: 22, metode: 'silang_jenjang_11_11', jumlahRuangManual: 2 },
+    'kertas',
+    () => 0.2
+  );
+
+  const parityBefore = analyzeRoomParity(res.updatedStudents, res.updatedRooms, 'kertas', 1);
+  assert.equal(parityBefore.nonReserveOddEntries.length, 1);
+  assert.equal(parityBefore.recommendReserveRoom, true);
+
+  const moved = moveOddStudentsToReserveRoom(res.updatedStudents, res.updatedRooms, 'kertas', 1);
+  assert.equal(moved.movedCount, 1);
+  assert.equal(moved.updatedRooms.some((r) => r.namaRuang === 'Ruang Cadangan'), true);
+  const parityAfter = analyzeRoomParity(moved.updatedStudents, moved.updatedRooms, 'kertas', 1);
+  assert.equal(parityAfter.nonReserveOddEntries.length, 0);
 });

@@ -17,6 +17,7 @@ import {
   computeRoomEquipmentRows,
 } from '../../utils/rekap';
 import { getSheetScreenStyle } from '../../utils/printLayout';
+import { formatPersonNameAndTitle } from '../../utils/formatName';
 
 export { computeRoomDuplicationBreakdown };
 
@@ -101,7 +102,7 @@ export const RekapKebutuhanCetak: React.FC<RekapKebutuhanCetakProps> = ({
             REKAPITULASI KEBUTUHAN PERLENGKAPAN & SARPRAS UJIAN
           </h2>
           <p className="text-xs font-semibold uppercase mt-0.5">
-            {profile.jenisUjian.toUpperCase()} • MODA {isOnline ? `ONLINE (${examConfig.jumlahSesi} SESI)` : 'KERTAS (PBT)'} • 1 MEJA = {kursiPerMeja} KURSI • TP {profile.tahunPelajaran}
+            {(profile.jenisUjian || 'UJIAN MADRASAH').toUpperCase()} • MODA {isOnline ? `ONLINE (${examConfig.jumlahSesi} SESI)` : 'KERTAS (PBT)'} • 1 MEJA = {kursiPerMeja} KURSI • TP {profile.tahunPelajaran || '-'}
           </p>
         </div>
 
@@ -204,8 +205,8 @@ export const RekapKebutuhanCetak: React.FC<RekapKebutuhanCetakProps> = ({
             <div className="h-14 flex items-center justify-center">
               <span className="text-[9px] text-slate-300 italic font-sans">( Tanda Tangan )</span>
             </div>
-            <p className="font-bold underline uppercase text-slate-950">
-              {profile.namaKetuaPanitia || 'Ketua Panitia Ujian'}
+            <p className="font-bold underline text-slate-950">
+              {formatPersonNameAndTitle(profile.namaKetuaPanitia) || 'Ketua Panitia Ujian'}
             </p>
             <p className="text-[9.5px] font-sans">NIP. {profile.nipKetuaPanitia || '-'}</p>
           </div>
@@ -216,10 +217,18 @@ export const RekapKebutuhanCetak: React.FC<RekapKebutuhanCetakProps> = ({
             </p>
             <p className="font-bold">Kepala Madrasah,</p>
             <div className="h-14 flex items-center justify-center">
-              <span className="text-[9px] text-slate-300 italic font-sans">( Tanda Tangan & Cap )</span>
+              {profile.ttdKepalaUrl ? (
+                <img
+                  src={profile.ttdKepalaUrl}
+                  alt="TTD Kepala Madrasah"
+                  className="max-h-14 max-w-[140px] object-contain mx-auto"
+                />
+              ) : (
+                <span className="text-[9px] text-slate-300 italic font-sans">( Tanda Tangan & Cap )</span>
+              )}
             </div>
-            <p className="font-bold underline uppercase text-slate-950">
-              {profile.namaKepala || '.........................'}
+            <p className="font-bold underline text-slate-950">
+              {formatPersonNameAndTitle(profile.namaKepala) || '.........................'}
             </p>
             <p className="text-[9.5px] font-sans">NIP. {profile.nipKepala || '-'}</p>
           </div>
@@ -237,7 +246,7 @@ export const RekapKebutuhanCetak: React.FC<RekapKebutuhanCetakProps> = ({
             REKAPITULASI KEBUTUHAN PENGGANDAAN BERKAS & ADMINISTRASI RUANG
           </h2>
           <p className="text-xs font-semibold uppercase mt-0.5">
-            {profile.jenisUjian.toUpperCase()} •{' '}
+            {(profile.jenisUjian || 'UJIAN MADRASAH').toUpperCase()} •{' '}
             {isOnline
               ? 'MODA ONLINE (SOAL CBT DIGITAL — CETAK DH, BA & BLANGKO HP)'
               : `MODA KERTAS • CADANGAN ${cadangan} EKSEMPLAR / MAPEL / RUANG`}

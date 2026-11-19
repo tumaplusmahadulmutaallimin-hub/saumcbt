@@ -11,6 +11,7 @@ import {
 import { KopSurat } from './KopSurat';
 import { formatIndonesianDate } from '../../utils/qrBarcode';
 import { getSheetScreenStyle } from '../../utils/printLayout';
+import { formatPersonNameAndTitle } from '../../utils/formatName';
 
 interface DaftarHadirPengawasProps {
   profile: MadrasahProfile;
@@ -72,7 +73,7 @@ export const DaftarHadirPengawas: React.FC<DaftarHadirPengawasProps> = ({
             DAFTAR HADIR PENGAWAS UJIAN
           </h2>
           <p className="text-xs font-semibold uppercase mt-0.5">
-            {profile.jenisUjian.toUpperCase()} • TAHUN PELAJARAN {profile.tahunPelajaran}
+            {(profile.jenisUjian || 'UJIAN MADRASAH').toUpperCase()} • TAHUN PELAJARAN {profile.tahunPelajaran || '-'}
           </p>
         </div>
 
@@ -94,7 +95,7 @@ export const DaftarHadirPengawas: React.FC<DaftarHadirPengawasProps> = ({
                 <td className="border border-slate-900 px-2 py-1 text-center font-medium tabular-nums">
                   {idx + 1}
                 </td>
-                <td className="border border-slate-900 px-3 py-1 font-bold uppercase">{sp.nama}</td>
+                <td className="border border-slate-900 px-3 py-1 font-bold">{formatPersonNameAndTitle(sp.nama)}</td>
                 <td className="border border-slate-900 px-3 py-1 font-mono">{sp.nip || '-'}</td>
                 <td className="border border-slate-900 px-3 py-1">{sp.asalMadrasah}</td>
                 <td className="border border-slate-900 px-3 py-1 text-center font-medium">
@@ -127,8 +128,8 @@ export const DaftarHadirPengawas: React.FC<DaftarHadirPengawasProps> = ({
           <div className="text-center w-56 leading-tight">
             <p className="font-bold">Ketua Panitia Ujian,</p>
             <div className="h-14" />
-            <p className="font-bold underline uppercase text-slate-950">
-              {profile.namaKetuaPanitia || profile.namaKepala || '.........................'}
+            <p className="font-bold underline text-slate-950">
+              {formatPersonNameAndTitle(profile.namaKetuaPanitia || profile.namaKepala) || '.........................'}
             </p>
             <p className="text-[10px] font-sans">NIP. {profile.nipKetuaPanitia || '-'}</p>
           </div>
@@ -139,9 +140,17 @@ export const DaftarHadirPengawas: React.FC<DaftarHadirPengawasProps> = ({
               {formatIndonesianDate(profile.tanggalSurat)}
             </p>
             <p className="font-bold">Kepala Madrasah,</p>
-            <div className="h-14" />
-            <p className="font-bold underline uppercase text-slate-950">
-              {profile.namaKepala || '.........................'}
+            <div className="h-14 flex items-center justify-center">
+              {profile.ttdKepalaUrl && (
+                <img
+                  src={profile.ttdKepalaUrl}
+                  alt="TTD Kepala Madrasah"
+                  className="max-h-14 max-w-[140px] object-contain mx-auto"
+                />
+              )}
+            </div>
+            <p className="font-bold underline text-slate-950">
+              {formatPersonNameAndTitle(profile.namaKepala) || '.........................'}
             </p>
             <p className="text-[10px] font-sans">NIP. {profile.nipKepala || '-'}</p>
           </div>

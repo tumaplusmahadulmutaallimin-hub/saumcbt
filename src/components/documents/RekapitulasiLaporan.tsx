@@ -12,6 +12,7 @@ import {
 import { KopSurat } from './KopSurat';
 import { formatIndonesianDate } from '../../utils/qrBarcode';
 import { getSheetScreenStyle } from '../../utils/printLayout';
+import { formatPersonNameAndTitle } from '../../utils/formatName';
 
 interface RekapitulasiLaporanProps {
   profile: MadrasahProfile;
@@ -61,7 +62,7 @@ export const RekapitulasiLaporan: React.FC<RekapitulasiLaporanProps> = ({
             REKAPITULASI DAN LAPORAN ADMINISTRASI UJIAN
           </h2>
           <p className="text-xs font-semibold uppercase mt-0.5">
-            {profile.jenisUjian.toUpperCase()} - TAHUN PELAJARAN {profile.tahunPelajaran}
+            {(profile.jenisUjian || 'UJIAN MADRASAH').toUpperCase()} - TAHUN PELAJARAN {profile.tahunPelajaran || '-'}
           </p>
         </div>
 
@@ -195,8 +196,8 @@ export const RekapitulasiLaporan: React.FC<RekapitulasiLaporanProps> = ({
             <div className="h-16 flex items-center justify-center">
               <span className="text-[10px] text-slate-300 italic font-sans">( Tanda Tangan )</span>
             </div>
-            <p className="font-bold underline uppercase text-slate-950">
-              {profile.namaKetuaPanitia || 'Ketua Panitia Ujian'}
+            <p className="font-bold underline text-slate-950">
+              {formatPersonNameAndTitle(profile.namaKetuaPanitia) || 'Ketua Panitia Ujian'}
             </p>
             <p className="text-[10px] font-sans">NIP. {profile.nipKetuaPanitia || '-'}</p>
           </div>
@@ -208,10 +209,18 @@ export const RekapitulasiLaporan: React.FC<RekapitulasiLaporanProps> = ({
             </p>
             <p className="font-bold">Kepala Madrasah,</p>
             <div className="h-16 flex items-center justify-center">
-              <span className="text-[10px] text-slate-300 italic font-sans">( Tanda Tangan & Cap )</span>
+              {profile.ttdKepalaUrl ? (
+                <img
+                  src={profile.ttdKepalaUrl}
+                  alt="TTD Kepala Madrasah"
+                  className="max-h-16 max-w-[140px] object-contain mx-auto"
+                />
+              ) : (
+                <span className="text-[10px] text-slate-300 italic font-sans">( Tanda Tangan & Cap )</span>
+              )}
             </div>
-            <p className="font-bold underline uppercase text-slate-950">
-              {profile.namaKepala || '.........................'}
+            <p className="font-bold underline text-slate-950">
+              {formatPersonNameAndTitle(profile.namaKepala) || '.........................'}
             </p>
             <p className="text-[10px] font-sans">NIP. {profile.nipKepala || '-'}</p>
           </div>

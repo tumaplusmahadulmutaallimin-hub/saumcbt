@@ -14,6 +14,7 @@ import { KopSurat } from './KopSurat';
 import { formatDayAndDate } from '../../utils/qrBarcode';
 import { computeClassRangesInRoom } from '../../utils/seating';
 import { getSheetScreenStyle } from '../../utils/printLayout';
+import { formatPersonNameAndTitle } from '../../utils/formatName';
 
 interface SegelSoalCetakProps {
   profile: MadrasahProfile;
@@ -209,18 +210,18 @@ export const SegelSoalCetak: React.FC<SegelSoalCetakProps> = ({
                     <div>
                       <p className="font-bold">Pengawas Ruang I,</p>
                       <div className="h-14" />
-                      <p className="font-bold underline uppercase">{p1?.nama || '....................'}</p>
+                      <p className="font-bold underline">{formatPersonNameAndTitle(p1?.nama) || '....................'}</p>
                     </div>
                     <div>
                       <p className="font-bold">Pengawas Ruang II,</p>
                       <div className="h-14" />
-                      <p className="font-bold underline uppercase">{p2?.nama || '....................'}</p>
+                      <p className="font-bold underline">{formatPersonNameAndTitle(p2?.nama) || '....................'}</p>
                     </div>
                     <div>
                       <p className="font-bold">Ketua Panitia / Seksi Naskah,</p>
                       <div className="h-14" />
-                      <p className="font-bold underline uppercase">
-                        {profile.namaKetuaPanitia || '....................'}
+                      <p className="font-bold underline">
+                        {formatPersonNameAndTitle(profile.namaKetuaPanitia) || '....................'}
                       </p>
                     </div>
                   </div>

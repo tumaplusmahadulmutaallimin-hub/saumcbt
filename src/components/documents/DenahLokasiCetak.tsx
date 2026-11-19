@@ -12,6 +12,7 @@ import { KopSurat } from './KopSurat';
 import { formatIndonesianDate } from '../../utils/qrBarcode';
 import { computeClassRangesInRoom } from '../../utils/seating';
 import { getSheetScreenStyle } from '../../utils/printLayout';
+import { formatPersonNameAndTitle } from '../../utils/formatName';
 
 interface DenahLokasiCetakProps {
   profile: MadrasahProfile;
@@ -81,8 +82,8 @@ export const DenahLokasiCetak: React.FC<DenahLokasiCetakProps> = ({
             {assignedRooms.map((r) => {
               const roomStudents = students.filter((s) => s.ruangId === r.id && s.status === 'Aktif');
               const ranges = computeClassRangesInRoom(roomStudents, students);
-              const p1 = r.pengawas1Id ? supervisorMap.get(r.pengawas1Id)?.nama : undefined;
-              const p2 = r.pengawas2Id ? supervisorMap.get(r.pengawas2Id)?.nama : undefined;
+              const p1 = r.pengawas1Id ? formatPersonNameAndTitle(supervisorMap.get(r.pengawas1Id)?.nama) : undefined;
+              const p2 = r.pengawas2Id ? formatPersonNameAndTitle(supervisorMap.get(r.pengawas2Id)?.nama) : undefined;
               const sesiEntries = pc.sessionRoomMap
                 ? Object.entries(pc.sessionRoomMap).filter(([, rId]) => rId === r.id)
                 : [];
@@ -211,8 +212,16 @@ export const DenahLokasiCetak: React.FC<DenahLokasiCetakProps> = ({
           <div className="text-center w-60 leading-tight">
             <p className="font-bold">Mengetahui,</p>
             <p className="font-bold">Kepala Madrasah,</p>
-            <div className="h-12" />
-            <p className="font-bold underline uppercase">{profile.namaKepala || '.........................'}</p>
+            <div className="h-12 flex items-center justify-center">
+              {profile.ttdKepalaUrl && (
+                <img
+                  src={profile.ttdKepalaUrl}
+                  alt="TTD Kepala Madrasah"
+                  className="max-h-12 max-w-[130px] object-contain mx-auto"
+                />
+              )}
+            </div>
+            <p className="font-bold underline">{formatPersonNameAndTitle(profile.namaKepala) || '.........................'}</p>
             <p className="text-[10px] font-sans">NIP. {profile.nipKepala || '-'}</p>
           </div>
 
@@ -223,8 +232,8 @@ export const DenahLokasiCetak: React.FC<DenahLokasiCetakProps> = ({
             </p>
             <p className="font-bold">Ketua Panitia Ujian,</p>
             <div className="h-12" />
-            <p className="font-bold underline uppercase">
-              {profile.namaKetuaPanitia || profile.namaKepala || '.........................'}
+            <p className="font-bold underline">
+              {formatPersonNameAndTitle(profile.namaKetuaPanitia || profile.namaKepala) || '.........................'}
             </p>
             <p className="text-[10px] font-sans">NIP. {profile.nipKetuaPanitia || '-'}</p>
           </div>

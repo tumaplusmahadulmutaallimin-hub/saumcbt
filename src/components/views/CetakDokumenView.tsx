@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   FileText,
   FileCheck,
@@ -16,6 +16,8 @@ import {
   Smartphone,
   Users,
   PackageCheck,
+  Upload,
+  Trash2,
 } from 'lucide-react';
 import {
   CommitteeMember,
@@ -81,6 +83,7 @@ interface CetakDokumenViewProps {
   initialDocType?: DocumentType;
   initialRoomId?: string;
   onSavePreset?: (next: PaperPreset) => Promise<void>;
+  onUpdateProfile?: (nextProfile: MadrasahProfile) => Promise<void>;
 }
 
 export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
@@ -104,6 +107,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
   initialDocType,
   initialRoomId,
   onSavePreset,
+  onUpdateProfile,
 }) => {
   const [selectedDoc, setSelectedDoc] = useState<DocumentType>(initialDocType || 'denah_ruang');
   const [selectedRoomId, setSelectedRoomId] = useState<string>(initialRoomId || 'all');
@@ -112,6 +116,20 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
   const [selectedSesi, setSelectedSesi] = useState<number>(0);
   const [hpManualBlank, setHpManualBlank] = useState<boolean>(true);
   const [nomorMejaStyle, setNomorMejaStyle] = useState<NomorMejaPrintStyle>('label_lengkap');
+  const ttdFileRef = useRef<HTMLInputElement>(null);
+
+  const handleUploadTtdKepala = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !onUpdateProfile) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      if (typeof reader.result === 'string') {
+        await onUpdateProfile({ ...profile, ttdKepalaUrl: reader.result });
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
 
   const docCatalog: Array<{
     id: DocumentType;
@@ -329,6 +347,53 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
             </select>
           </div>
         )}
+        {selectedDoc === 'kartu_peserta' && (
+          <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5">
+              <span className="font-bold text-slate-800">TTD Kepala Madrasah (JPG/PNG):</span>
+              {profile.ttdKepalaUrl ? (
+                <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-1">
+                  <img
+                    src={profile.ttdKepalaUrl}
+                    alt="Pratinjau TTD Kepala"
+                    className="h-6 max-w-[70px] object-contain"
+                  />
+                  <span className="text-emerald-800 font-semibold">Terpasang</span>
+                </div>
+              ) : (
+                <span className="text-slate-500">Belum diunggah (menampilkan placeholder TTD)</span>
+              )}
+            </div>
+            {onUpdateProfile && (
+              <div className="flex items-center gap-2">
+                <input
+                  ref={ttdFileRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleUploadTtdKepala}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => ttdFileRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 font-semibold text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  {profile.ttdKepalaUrl ? 'Ganti TTD Kepala (JPG)' : 'Upload TTD Kepala (JPG)'}
+                </button>
+                {profile.ttdKepalaUrl && (
+                  <button
+                    type="button"
+                    onClick={() => onUpdateProfile({ ...profile, ttdKepalaUrl: undefined })}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Hapus TTD
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <PrintToolbar
@@ -336,6 +401,10 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
         layout={layout}
         onLayoutChange={setLayout}
         onSaveLayout={onSavePreset}
+        showCardDensity={
+          selectedDoc === 'kartu_peserta' ||
+          (selectedDoc === 'label_meja' && nomorMejaStyle !== 'daftar_meja')
+        }
         onExportExcel={
           canExportTableExcel
             ? () => exportStudentsToExcel(filteredStudents, examConfig.moda === 'online', `${selectedDoc}_SAUM.xlsx`)
@@ -509,6 +578,10 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
             numberingConfig={numberingConfig}
             selectedRoomId={selectedRoomId}
             paperPreset={layout}
+            cardsPerPage={layout.cardsPerPage}
+            onRequestUploadTtdKepala={
+              onUpdateProfile ? () => ttdFileRef.current?.click() : undefined
+            }
           />
         )}
 

@@ -203,10 +203,12 @@ export const saumApi = {
   saveExamConfig: (examConfig: ExamConfig) =>
     withFallback(
       () =>
-        request<{ examConfig: ExamConfig; profile: MadrasahProfile; auditLogs: AuditLogEntry[] }>(
-          '/api/exam-config',
-          { method: 'PUT', body: JSON.stringify(examConfig) }
-        ),
+        request<{
+          examConfig: ExamConfig;
+          profile: MadrasahProfile;
+          roomConfig: RoomDistributionConfig;
+          auditLogs: AuditLogEntry[];
+        }>('/api/exam-config', { method: 'PUT', body: JSON.stringify(examConfig) }),
       () => localFallbackApi.saveExamConfig(examConfig)
     ),
 

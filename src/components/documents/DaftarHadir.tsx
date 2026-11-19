@@ -15,6 +15,7 @@ import { KopSurat } from './KopSurat';
 import { formatDayAndDate } from '../../utils/qrBarcode';
 import { compareClasses } from '../../utils/numbering';
 import { getSheetScreenStyle } from '../../utils/printLayout';
+import { formatPersonNameAndTitle } from '../../utils/formatName';
 
 interface DaftarHadirProps {
   profile: MadrasahProfile;
@@ -199,8 +200,8 @@ export const DaftarHadir: React.FC<DaftarHadirProps> = ({
                           <td className="border border-slate-900 px-2 py-1 text-center font-mono tabular-nums">
                             {st.nisn}
                           </td>
-                          <td className="border border-slate-900 px-2.5 py-1 font-semibold uppercase">
-                            {st.nama}
+                          <td className="border border-slate-900 px-2.5 py-1 font-semibold">
+                            {formatPersonNameAndTitle(st.nama)}
                           </td>
                           <td className="border border-slate-900 px-1.5 py-1 text-center font-medium">
                             {st.jenisKelamin}
@@ -237,8 +238,8 @@ export const DaftarHadir: React.FC<DaftarHadirProps> = ({
                 <div className="text-center w-56 leading-tight">
                   <p className="font-bold">Pengawas Ruang I,</p>
                   <div className="h-14" />
-                  <p className="font-bold underline uppercase">
-                    {pengawas1?.nama || '...........................................'}
+                  <p className="font-bold underline">
+                    {formatPersonNameAndTitle(pengawas1?.nama) || '...........................................'}
                   </p>
                   <p className="text-[9.5px] font-sans">NIP. {pengawas1?.nip || '...........................'}</p>
                 </div>
@@ -250,8 +251,8 @@ export const DaftarHadir: React.FC<DaftarHadirProps> = ({
                   </p>
                   <p className="font-bold">Pengawas Ruang II,</p>
                   <div className="h-14" />
-                  <p className="font-bold underline uppercase">
-                    {pengawas2?.nama || '...........................................'}
+                  <p className="font-bold underline">
+                    {formatPersonNameAndTitle(pengawas2?.nama) || '...........................................'}
                   </p>
                   <p className="text-[9.5px] font-sans">NIP. {pengawas2?.nip || '...........................'}</p>
                 </div>

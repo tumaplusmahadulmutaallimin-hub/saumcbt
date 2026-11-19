@@ -16,8 +16,11 @@ import {
   Student,
 } from '../../types';
 import {
+  analyzeRoomParity,
+  balanceOddRooms,
   distributeRoomsCrossJenjang,
   distributeSessions,
+  moveOddStudentsToReserveRoom,
 } from '../../utils/seating';
 import { extractJenjang } from '../../utils/dnpu';
 
@@ -44,7 +47,10 @@ export const RuangSesiView: React.FC<RuangSesiViewProps> = ({
   onSaveRooms,
   onNavigateToDenah,
 }) => {
-  const [localConfig, setLocalConfig] = useState<RoomDistributionConfig>(roomConfig);
+  const [localConfig, setLocalConfig] = useState<RoomDistributionConfig>(() => ({
+    ...roomConfig,
+    jumlahRuangManual: roomConfig.jumlahRuangManual || examConfig.jumlahRuang || rooms.length || 1,
+  }));
   const [warnings, setWarnings] = useState<string[]>([]);
   const [notice, setNotice] = useState('');
   const [movingStudent, setMovingStudent] = useState<Student | null>(null);
@@ -52,12 +58,20 @@ export const RuangSesiView: React.FC<RuangSesiViewProps> = ({
   const [targetSesi, setTargetSesi] = useState<number>(1);
 
   useEffect(() => {
-    setLocalConfig(roomConfig);
-  }, [roomConfig]);
+    setLocalConfig({
+      ...roomConfig,
+      jumlahRuangManual: roomConfig.jumlahRuangManual || examConfig.jumlahRuang || rooms.length || 1,
+    });
+  }, [roomConfig, examConfig.jumlahRuang, rooms.length]);
 
   const isOnline = examConfig.moda === 'online';
   const activeStudents = students.filter((s) => s.status === 'Aktif');
   const anyRoomLocked = rooms.some((r) => r.isLocked);
+
+  const parityAnalysis = useMemo(
+    () => analyzeRoomParity(students, rooms, examConfig.moda, examConfig.jumlahSesi),
+    [students, rooms, examConfig.moda, examConfig.jumlahSesi]
+  );
 
   const sessionStats = useMemo(() => {
     if (!isOnline) return [];
@@ -100,22 +114,60 @@ export const RuangSesiView: React.FC<RuangSesiViewProps> = ({
       setWarnings(['Belum ada peserta aktif di DNPU. Tambahkan peserta di Data DNPU terlebih dahulu.']);
       return;
     }
+    const cleanCfg: RoomDistributionConfig = {
+      ...localConfig,
+      kapasitasPerRuang: Math.min(22, Math.max(1, localConfig.kapasitasPerRuang || 22)),
+    };
     const res = distributeRoomsCrossJenjang(
       students,
       rooms,
-      {
-        ...localConfig,
-        kapasitasPerRuang: Math.min(22, Math.max(1, localConfig.kapasitasPerRuang || 22)),
-      },
-      examConfig.moda
+      cleanCfg,
+      examConfig.moda,
+      Math.random,
+      { examJumlahRuang: examConfig.jumlahRuang }
     );
     setWarnings(res.warnings);
+    const savedCfg = { ...cleanCfg, jumlahRuangManual: res.updatedRooms.length };
+    setLocalConfig(savedCfg);
     await onSaveRooms({
       students: res.updatedStudents,
       rooms: res.updatedRooms,
+      roomConfig: savedCfg,
+    });
+    setNotice(
+      `Pembagian ${res.updatedRooms.length} ruang berhasil dijalankan (maks ${cleanCfg.kapasitasPerRuang} kursi/ruang, ruang bawah prioritas 2 jenjang & campuran 3 jenjang di ruang akhir).`
+    );
+  };
+
+  const handleAutoBalanceOddRooms = async () => {
+    const res = balanceOddRooms(students, rooms, examConfig.moda, examConfig.jumlahSesi);
+    if (res.movedCount === 0) {
+      setWarnings(['Tidak ada pasangan ruang ganjil yang dapat diseimbangkan langsung tanpa menambah Ruang Cadangan.']);
+      return;
+    }
+    setWarnings([]);
+    await onSaveRooms({
+      students: res.updatedStudents,
+      rooms,
       roomConfig: localConfig,
     });
-    setNotice(`Pembagian ${res.updatedRooms.length} ruang berhasil dijalankan (maks 22 kursi/ruang, komposisi lintas jenjang 11:11).`);
+    setNotice(`${res.movedCount} peserta dipindahkan antar-ruang ganjil agar pasangan meja (1 meja = 2 kursi) seimbang dan genap.`);
+  };
+
+  const handleMoveOddToReserveRoom = async () => {
+    const res = moveOddStudentsToReserveRoom(students, rooms, examConfig.moda, examConfig.jumlahSesi);
+    if (res.movedCount === 0) return;
+    setWarnings([]);
+    const savedCfg = { ...localConfig, jumlahRuangManual: res.updatedRooms.length };
+    setLocalConfig(savedCfg);
+    await onSaveRooms({
+      students: res.updatedStudents,
+      rooms: res.updatedRooms,
+      roomConfig: savedCfg,
+    });
+    setNotice(
+      `${res.movedCount} siswa kursi ganjil ditempatkan ke Ruang Cadangan agar ruang reguler terisi genap (1 meja = 2 kursi berbeda jenjang).`
+    );
   };
 
   const handleToggleLock = async (roomId: string) => {
@@ -269,7 +321,7 @@ export const RuangSesiView: React.FC<RuangSesiViewProps> = ({
               type="number"
               min={1}
               disabled={!canEdit}
-              value={localConfig.jumlahRuangManual || Math.max(1, rooms.length)}
+              value={localConfig.jumlahRuangManual || examConfig.jumlahRuang || Math.max(1, rooms.length)}
               onChange={(e) =>
                 setLocalConfig({
                   ...localConfig,
@@ -281,6 +333,55 @@ export const RuangSesiView: React.FC<RuangSesiViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Automatic Validation & Reserve Room Recommendation for Odd Rooms */}
+      {(parityAnalysis.nonReserveOddEntries.length > 0 ||
+        parityAnalysis.sameJenjangDeskConflicts.length > 0) && (
+        <div
+          data-testid="odd-room-validation-banner"
+          className="bg-amber-50 border border-amber-300 text-amber-950 p-4 rounded-xl space-y-2.5 text-xs"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-start gap-2.5 max-w-3xl">
+              <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                {parityAnalysis.nonReserveOddEntries.length > 0 && (
+                  <>
+                    <p className="font-bold text-amber-950">{parityAnalysis.headline}</p>
+                    <p className="text-amber-900">{parityAnalysis.suggestionText}</p>
+                  </>
+                )}
+                {parityAnalysis.sameJenjangDeskConflicts.length > 0 && (
+                  <p className="font-semibold text-red-800">
+                    Catatan meja: Terdapat {parityAnalysis.sameJenjangDeskConflicts.length} meja fisik dengan 2 siswa berjenjang sama (akibat dominasi satu jenjang di ruangan tersebut).
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {canEdit && parityAnalysis.nonReserveOddEntries.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                {parityAnalysis.canAutoBalancePairs.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleAutoBalanceOddRooms}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-amber-950 bg-white border border-amber-400 hover:bg-amber-100 rounded-lg cursor-pointer whitespace-nowrap"
+                  >
+                    <ArrowRightLeft className="w-3.5 h-3.5" /> Seimbangkan Ruang Ganjil
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleMoveOddToReserveRoom}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-amber-700 hover:bg-amber-800 rounded-lg cursor-pointer whitespace-nowrap"
+                >
+                  <DoorClosed className="w-3.5 h-3.5" /> Pindahkan ke Ruang Cadangan
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Room Cards Summary */}
       {rooms.length === 0 ? (
@@ -302,9 +403,21 @@ export const RuangSesiView: React.FC<RuangSesiViewProps> = ({
             <div key={room.id} className="bg-white p-5 rounded-xl border border-slate-200 space-y-3">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    {room.namaRuang} (Ruang {room.nomorRuang})
-                  </h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm font-bold text-slate-900">
+                      {room.namaRuang} (Ruang {room.nomorRuang})
+                    </h3>
+                    {roomStudents.length % 2 === 1 && !/cadangan/i.test(room.namaRuang) && (
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300">
+                        Ganjil • 1 Kursi Terpisah
+                      </span>
+                    )}
+                    {/cadangan/i.test(room.namaRuang) && (
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-300">
+                        Cadangan
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-slate-500 tabular-nums">
                     Terisi: <strong>{roomStudents.length}</strong> / {room.kapasitas} kursi
                     {isOnline ? ` (tersebar di ${examConfig.jumlahSesi} sesi)` : ''}

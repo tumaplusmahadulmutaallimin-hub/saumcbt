@@ -99,7 +99,10 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
 
   // Master Generator Config States
   const [localNumbering, setLocalNumbering] = useState<NumberingConfig>(numberingConfig);
-  const [localRoomConfig, setLocalRoomConfig] = useState<RoomDistributionConfig>(roomConfig);
+  const [localRoomConfig, setLocalRoomConfig] = useState<RoomDistributionConfig>(() => ({
+    ...roomConfig,
+    jumlahRuangManual: roomConfig.jumlahRuangManual || examConfig.jumlahRuang || 0,
+  }));
   const [masterBusy, setMasterBusy] = useState<string>('');
 
   // Import Wizard State
@@ -132,8 +135,11 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
   }, [numberingConfig]);
 
   React.useEffect(() => {
-    setLocalRoomConfig(roomConfig);
-  }, [roomConfig]);
+    setLocalRoomConfig({
+      ...roomConfig,
+      jumlahRuangManual: roomConfig.jumlahRuangManual || examConfig.jumlahRuang || 0,
+    });
+  }, [roomConfig, examConfig.jumlahRuang]);
 
   const roomMap = new Map(rooms.map((r) => [r.id, r]));
   const nomorValidation = useMemo(() => validateParticipantNumbers(students), [students]);
@@ -408,11 +414,18 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
         ...localRoomConfig,
         kapasitasPerRuang: Math.min(22, Math.max(1, localRoomConfig.kapasitasPerRuang || 22)),
       };
-      const res = distributeRoomsCrossJenjang(students, rooms, cleanConfig, examConfig.moda);
+      const res = distributeRoomsCrossJenjang(
+        students,
+        rooms,
+        cleanConfig,
+        examConfig.moda,
+        Math.random,
+        { examJumlahRuang: examConfig.jumlahRuang }
+      );
       await onSaveRooms({
         students: res.updatedStudents,
         rooms: res.updatedRooms,
-        roomConfig: cleanConfig,
+        roomConfig: { ...cleanConfig, jumlahRuangManual: res.updatedRooms.length },
       });
       setStatusBanner(
         `Pembagian ${res.updatedRooms.length} ruang & nomor kursi berhasil digenerate untuk ${activeStudentsCount} peserta.${
@@ -450,7 +463,14 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
         ...localRoomConfig,
         kapasitasPerRuang: Math.min(22, Math.max(1, localRoomConfig.kapasitasPerRuang || 22)),
       };
-      const roomRes = distributeRoomsCrossJenjang(stepSesi, rooms, cleanRoomCfg, examConfig.moda);
+      const roomRes = distributeRoomsCrossJenjang(
+        stepSesi,
+        rooms,
+        cleanRoomCfg,
+        examConfig.moda,
+        Math.random,
+        { examJumlahRuang: examConfig.jumlahRuang }
+      );
       const finalStudents = generateExamCredentials(roomRes.updatedStudents, {
         basis: credBasis,
         prefix: credPrefix,
@@ -463,7 +483,7 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
       await onSaveRooms({
         students: finalStudents,
         rooms: roomRes.updatedRooms,
-        roomConfig: cleanRoomCfg,
+        roomConfig: { ...cleanRoomCfg, jumlahRuangManual: roomRes.updatedRooms.length },
       });
       await onSaveNumbering({
         students: finalStudents,
@@ -660,7 +680,7 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
           </div>
 
           {/* Quick Master Parameters */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 text-xs">
             <div>
               <label className="block font-semibold text-slate-600 mb-1">Kode Tahun</label>
               <input
@@ -704,6 +724,22 @@ export const DnpuView: React.FC<DnpuViewProps> = ({
                 <option value="nisn">NISN</option>
                 <option value="nis">NIS</option>
               </select>
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">Jumlah Ruang</label>
+              <input
+                type="number"
+                min={0}
+                title="Isi 0 untuk hitung otomatis sesuai kapasitas ruang"
+                value={localRoomConfig.jumlahRuangManual ?? examConfig.jumlahRuang ?? 0}
+                onChange={(e) =>
+                  setLocalRoomConfig({
+                    ...localRoomConfig,
+                    jumlahRuangManual: Math.max(0, Number(e.target.value) || 0),
+                  })
+                }
+                className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-mono tabular-nums"
+              />
             </div>
             <div>
               <label className="block font-semibold text-slate-600 mb-1">Kapasitas / Ruang</label>

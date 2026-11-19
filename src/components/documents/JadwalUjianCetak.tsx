@@ -13,6 +13,7 @@ import { KopSurat } from './KopSurat';
 import { formatDayAndDate, formatIndonesianDate } from '../../utils/qrBarcode';
 import { extractJenjang } from '../../utils/dnpu';
 import { getSheetScreenStyle } from '../../utils/printLayout';
+import { formatPersonNameAndTitle } from '../../utils/formatName';
 
 interface JadwalUjianCetakProps {
   profile: MadrasahProfile;
@@ -179,8 +180,16 @@ export const JadwalUjianCetak: React.FC<JadwalUjianCetakProps> = ({
           <div className="text-center w-56 leading-tight">
             <p className="font-bold">Mengetahui,</p>
             <p className="font-bold">Kepala Madrasah,</p>
-            <div className="h-12" />
-            <p className="font-bold underline uppercase">{profile.namaKepala || '.........................'}</p>
+            <div className="h-12 flex items-center justify-center">
+              {profile.ttdKepalaUrl && (
+                <img
+                  src={profile.ttdKepalaUrl}
+                  alt="TTD Kepala Madrasah"
+                  className="max-h-12 max-w-[130px] object-contain mx-auto"
+                />
+              )}
+            </div>
+            <p className="font-bold underline">{formatPersonNameAndTitle(profile.namaKepala) || '.........................'}</p>
             <p className="text-[9.5px] font-sans">NIP. {profile.nipKepala || '-'}</p>
           </div>
           <div className="text-center w-56 leading-tight">
@@ -190,8 +199,8 @@ export const JadwalUjianCetak: React.FC<JadwalUjianCetakProps> = ({
             </p>
             <p className="font-bold">Ketua Panitia Ujian,</p>
             <div className="h-12" />
-            <p className="font-bold underline uppercase">
-              {profile.namaKetuaPanitia || profile.namaKepala || '.........................'}
+            <p className="font-bold underline">
+              {formatPersonNameAndTitle(profile.namaKetuaPanitia || profile.namaKepala) || '.........................'}
             </p>
             <p className="text-[9.5px] font-sans">NIP. {profile.nipKetuaPanitia || '-'}</p>
           </div>

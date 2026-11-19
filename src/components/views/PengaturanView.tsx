@@ -78,6 +78,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
   const kopFileRef = useRef<HTMLInputElement>(null);
   const logoMadrasahRef = useRef<HTMLInputElement>(null);
   const logoKemenagRef = useRef<HTMLInputElement>(null);
+  const ttdKepalaRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -99,7 +100,7 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
 
   const handleUploadImage = (
     e: React.ChangeEvent<HTMLInputElement>,
-    field: 'kopImageUrl' | 'logoMadrasahUrl' | 'logoKemenagUrl'
+    field: 'kopImageUrl' | 'logoMadrasahUrl' | 'logoKemenagUrl' | 'ttdKepalaUrl'
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -760,6 +761,56 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
                 onChange={(e) => setLocalProfile({ ...localProfile, tanggalSurat: e.target.value })}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono"
               />
+            </div>
+            <div className="md:col-span-3 p-4 rounded-xl border border-slate-200 bg-slate-50/70 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-28 h-14 rounded-lg border border-slate-200 bg-white flex items-center justify-center overflow-hidden shrink-0 p-1">
+                  {localProfile.ttdKepalaUrl ? (
+                    <img
+                      src={localProfile.ttdKepalaUrl}
+                      alt="TTD Kepala Madrasah"
+                      className="max-h-full max-w-full object-contain"
+                    />
+                  ) : (
+                    <span className="text-[10px] text-slate-400 font-semibold text-center">
+                      Belum ada TTD
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <p className="font-bold text-slate-900">Tanda Tangan Kepala Madrasah (JPG / PNG)</p>
+                  <p className="text-[11px] text-slate-500">
+                    Ditampilkan otomatis pada Kartu Peserta Ujian &amp; dokumen pengesahan Kepala Madrasah.
+                  </p>
+                </div>
+              </div>
+              {canEdit && (
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={ttdKepalaRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={(e) => handleUploadImage(e, 'ttdKepalaUrl')}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => ttdKepalaRef.current?.click()}
+                    className="px-3.5 py-2 font-semibold bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 rounded-lg cursor-pointer"
+                  >
+                    {localProfile.ttdKepalaUrl ? 'Ganti File TTD (JPG)' : 'Upload File TTD (JPG)'}
+                  </button>
+                  {localProfile.ttdKepalaUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setLocalProfile({ ...localProfile, ttdKepalaUrl: undefined })}
+                      className="px-3 py-2 font-semibold bg-red-50 text-red-700 border border-red-200 rounded-lg cursor-pointer"
+                    >
+                      Hapus TTD
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
             {canEdit && (
               <div className="md:col-span-3 flex justify-end pt-2 border-t border-slate-100">

@@ -404,6 +404,7 @@ export default function App() {
                       setState((prev) => ({
                         ...prev,
                         examConfig: res.examConfig,
+                        roomConfig: res.roomConfig || prev.roomConfig,
                         profile: updatedProfile,
                         auditLogs: res.auditLogs,
                       }));
@@ -815,6 +816,16 @@ export default function App() {
                   initialDocType={activeDocSubtype}
                   initialRoomId={activeRoomContextId}
                   onSavePreset={handleSavePaperPreset}
+                  onUpdateProfile={async (nextProfile) => {
+                    await withErrorCatch(async () => {
+                      const res = await saumApi.saveSettings({ profile: nextProfile });
+                      setState((prev) => ({
+                        ...prev,
+                        profile: res.profile,
+                        auditLogs: res.auditLogs,
+                      }));
+                    });
+                  }}
                 />
               )}
 

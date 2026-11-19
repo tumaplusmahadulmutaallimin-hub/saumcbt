@@ -3,6 +3,7 @@ import { CommitteeMember, ExamRoom, MadrasahProfile, PaperPreset, Supervisor } f
 import { KopSurat } from './KopSurat';
 import { formatIndonesianDate } from '../../utils/qrBarcode';
 import { getSheetScreenStyle } from '../../utils/printLayout';
+import { formatPersonNameAndTitle } from '../../utils/formatName';
 
 interface SKPanitiaProps {
   profile: MadrasahProfile;
@@ -35,15 +36,15 @@ export const SKPanitia: React.FC<SKPanitiaProps> = ({
 
           <div className="text-center my-3">
             <h2 className="text-xs font-bold uppercase font-serif tracking-wider">
-              KEPUTUSAN KEPALA {profile.namaMadrasah.toUpperCase()}
+              KEPUTUSAN KEPALA {(profile.namaMadrasah || 'MADRASAH').toUpperCase()}
             </h2>
             <p className="text-[10px] font-mono mt-0.5">
               NOMOR: {profile.nsm} / SK-PANITIA / {new Date().getFullYear()}
             </p>
             <p className="text-xs font-bold uppercase mt-1">TENTANG</p>
             <p className="text-xs font-extrabold uppercase text-slate-950 max-w-lg mx-auto">
-              SUSUNAN PANITIA PELAKSANA {profile.jenisUjian.toUpperCase()}
-              <br />TAHUN PELAJARAN {profile.tahunPelajaran}
+              SUSUNAN PANITIA PELAKSANA {(profile.jenisUjian || 'UJIAN MADRASAH').toUpperCase()}
+              <br />TAHUN PELAJARAN {profile.tahunPelajaran || '-'}
             </p>
           </div>
 
@@ -111,7 +112,7 @@ export const SKPanitia: React.FC<SKPanitiaProps> = ({
                   <tr key={c.id}>
                     <td className="border border-slate-900 px-2 py-1 text-center font-medium">{idx + 1}</td>
                     <td className="border border-slate-900 px-3 py-1">
-                      <p className="font-bold text-slate-900 uppercase">{c.nama}</p>
+                      <p className="font-bold text-slate-900">{formatPersonNameAndTitle(c.nama)}</p>
                       <p className="text-[9px] text-slate-500 font-mono">NIP: {c.nip || '-'}</p>
                     </td>
                     <td className="border border-slate-900 px-3 py-1 font-semibold text-emerald-900">{c.jabatan}</td>
@@ -130,10 +131,18 @@ export const SKPanitia: React.FC<SKPanitiaProps> = ({
               </p>
               <p className="font-bold mt-1">Kepala Madrasah,</p>
               <div className="h-14 flex items-center justify-center">
-                <span className="text-[9px] text-slate-300 italic font-sans">( Tanda Tangan & Cap )</span>
+                {profile.ttdKepalaUrl ? (
+                  <img
+                    src={profile.ttdKepalaUrl}
+                    alt="TTD Kepala Madrasah"
+                    className="max-h-14 max-w-[140px] object-contain mx-auto"
+                  />
+                ) : (
+                  <span className="text-[9px] text-slate-300 italic font-sans">( Tanda Tangan & Cap )</span>
+                )}
               </div>
-              <p className="font-bold underline uppercase text-slate-950">
-                {profile.namaKepala || '.........................'}
+              <p className="font-bold underline text-slate-950">
+                {formatPersonNameAndTitle(profile.namaKepala) || '.........................'}
               </p>
               <p className="text-[10px] font-sans">NIP. {profile.nipKepala || '-'}</p>
             </div>
@@ -184,7 +193,7 @@ export const SKPanitia: React.FC<SKPanitiaProps> = ({
                 return (
                   <tr key={sp.id}>
                     <td className="border border-slate-900 px-2 py-1 text-center font-medium">{idx + 1}</td>
-                    <td className="border border-slate-900 px-3 py-1 font-bold uppercase">{sp.nama}</td>
+                    <td className="border border-slate-900 px-3 py-1 font-bold">{formatPersonNameAndTitle(sp.nama)}</td>
                     <td className="border border-slate-900 px-3 py-1 font-mono">{sp.nip || '-'}</td>
                     <td className="border border-slate-900 px-3 py-1">{sp.asalMadrasah}</td>
                     <td className="border border-slate-900 px-3 py-1 text-center font-bold text-emerald-900">
@@ -212,10 +221,18 @@ export const SKPanitia: React.FC<SKPanitiaProps> = ({
             </p>
             <p className="font-bold mt-1">Kepala Madrasah,</p>
             <div className="h-16 flex items-center justify-center">
-              <span className="text-[10px] text-slate-300 italic font-sans">( Tanda Tangan & Cap )</span>
+              {profile.ttdKepalaUrl ? (
+                <img
+                  src={profile.ttdKepalaUrl}
+                  alt="TTD Kepala Madrasah"
+                  className="max-h-16 max-w-[140px] object-contain mx-auto"
+                />
+              ) : (
+                <span className="text-[10px] text-slate-300 italic font-sans">( Tanda Tangan & Cap )</span>
+              )}
             </div>
-            <p className="font-bold underline uppercase text-slate-950">
-              {profile.namaKepala || '.........................'}
+            <p className="font-bold underline text-slate-950">
+              {formatPersonNameAndTitle(profile.namaKepala) || '.........................'}
             </p>
             <p className="text-[10px] font-sans">NIP. {profile.nipKepala || '-'}</p>
           </div>

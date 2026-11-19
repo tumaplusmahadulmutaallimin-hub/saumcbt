@@ -14,6 +14,7 @@ import { KopSurat } from './KopSurat';
 import { formatDayAndDate, formatIndonesianDate } from '../../utils/qrBarcode';
 import { computeClassRangesInRoom } from '../../utils/seating';
 import { getSheetScreenStyle } from '../../utils/printLayout';
+import { formatPersonNameAndTitle } from '../../utils/formatName';
 
 interface BeritaAcaraProps {
   profile: MadrasahProfile;
@@ -237,8 +238,8 @@ export const BeritaAcara: React.FC<BeritaAcaraProps> = ({
                   <div className="text-center w-52 leading-tight">
                     <p className="font-bold">Pengawas Ruang I,</p>
                     <div className="h-14" />
-                    <p className="font-bold underline uppercase">
-                      {pengawas1?.nama || '...........................................'}
+                    <p className="font-bold underline">
+                      {formatPersonNameAndTitle(pengawas1?.nama) || '...........................................'}
                     </p>
                     <p className="text-[9.5px] font-sans">NIP. {pengawas1?.nip || '...........................'}</p>
                   </div>
@@ -250,8 +251,8 @@ export const BeritaAcara: React.FC<BeritaAcaraProps> = ({
                     </p>
                     <p className="font-bold">Pengawas Ruang II,</p>
                     <div className="h-14" />
-                    <p className="font-bold underline uppercase">
-                      {pengawas2?.nama || '...........................................'}
+                    <p className="font-bold underline">
+                      {formatPersonNameAndTitle(pengawas2?.nama) || '...........................................'}
                     </p>
                     <p className="text-[9.5px] font-sans">NIP. {pengawas2?.nip || '...........................'}</p>
                   </div>
@@ -259,8 +260,16 @@ export const BeritaAcara: React.FC<BeritaAcaraProps> = ({
 
                 <div className="mt-3 text-center text-xs flex flex-col items-center">
                   <p className="font-bold">Mengetahui, Kepala Madrasah,</p>
-                  <div className="h-12" />
-                  <p className="font-bold underline uppercase">{profile.namaKepala || '.........................'}</p>
+                  <div className="h-12 flex items-center justify-center">
+                    {profile.ttdKepalaUrl && (
+                      <img
+                        src={profile.ttdKepalaUrl}
+                        alt="TTD Kepala Madrasah"
+                        className="max-h-12 max-w-[130px] object-contain mx-auto"
+                      />
+                    )}
+                  </div>
+                  <p className="font-bold underline">{formatPersonNameAndTitle(profile.namaKepala) || '.........................'}</p>
                   <p className="text-[9.5px] font-sans">NIP. {profile.nipKepala || '-'}</p>
                 </div>
               </div>

@@ -45,6 +45,7 @@ export interface MadrasahProfile {
   tanggalSurat: string;
   logoMadrasahUrl?: string;
   logoKemenagUrl?: string;
+  ttdKepalaUrl?: string; // Uploaded Kepala Madrasah signature image (JPG/PNG)
   kopImageUrl?: string; // Uploaded original KOP image (JPG/PNG)
   kopWidthPercent?: number; // e.g., 100
   kopPosition?: 'left' | 'center' | 'right';
