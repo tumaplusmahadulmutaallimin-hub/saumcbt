@@ -42,7 +42,7 @@ import {
   validateParticipantNumbers,
 } from '../../utils/numbering';
 import { SimpleBarcode, SimpleQRCode, formatIndonesianDate } from '../../utils/qrBarcode';
-import { usePrintLayout } from '../../utils/printLayout';
+import { normalizeTargetPaperPreset, usePrintLayout } from '../../utils/printLayout';
 import { PrintToolbar } from '../documents/PrintToolbar';
 import { KartuPeserta } from '../documents/KartuPeserta';
 import { DnpuCetak } from '../documents/DnpuCetak';
@@ -101,8 +101,11 @@ export const PenomoranView: React.FC<PenomoranViewProps> = ({
 
   const kartuPreset = useMemo(
     () =>
-      paperPresets.find((p) => p.id === 'kartu_peserta') ||
-      paperPresets.find((p) => p.id === 'default'),
+      normalizeTargetPaperPreset(
+        'kartu_peserta',
+        paperPresets.find((p) => p.id === 'kartu_peserta') ||
+          paperPresets.find((p) => p.id === 'default')
+      ),
     [paperPresets]
   );
   const daftarPreset = useMemo(
@@ -113,7 +116,7 @@ export const PenomoranView: React.FC<PenomoranViewProps> = ({
   const { layout: kartuLayout, setLayout: setKartuLayout } = usePrintLayout(kartuPreset, {
     size: 'F4',
     orientation: 'portrait',
-    marginMm: 6,
+    marginMm: 15,
   });
   const { layout: daftarLayout, setLayout: setDaftarLayout } = usePrintLayout(daftarPreset, {
     size: 'A4',
@@ -1020,6 +1023,7 @@ export const PenomoranView: React.FC<PenomoranViewProps> = ({
           layout={activeLayout}
           onLayoutChange={handleLayoutChange}
           onSaveLayout={onSavePreset}
+          namedPage={previewDoc === 'kartu_peserta' ? 'f4_card' : undefined}
           defaultOpenLayout={true}
           showCardDensity={previewDoc === 'kartu_peserta'}
           showKopToggle={previewDoc === 'nomor_peserta'}

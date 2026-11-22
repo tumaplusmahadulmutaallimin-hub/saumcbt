@@ -9,7 +9,7 @@ import {
 } from '../../types';
 import { KopSurat } from './KopSurat';
 import { SimpleBarcode, SimpleQRCode, formatIndonesianDate } from '../../utils/qrBarcode';
-import { getCardGridMetrics, getSheetScreenStyle } from '../../utils/printLayout';
+import { getCardGridMetrics, getSheetScreenStyle, normalizeTargetPaperPreset } from '../../utils/printLayout';
 import { formatPersonNameAndTitle } from '../../utils/formatName';
 
 interface KartuPesertaProps {
@@ -45,10 +45,12 @@ export const KartuPeserta: React.FC<KartuPesertaProps> = ({
     filtered = filtered.filter((s) => s.id === selectedStudentId);
   }
 
-  const metrics = getCardGridMetrics(paperPreset, {
+  const effectivePreset = normalizeTargetPaperPreset('kartu_peserta', paperPreset);
+  const metrics = getCardGridMetrics(effectivePreset, {
     defaultSize: 'F4',
-    defaultCardsPerPage: cardsPerPage || paperPreset?.cardsPerPage || 6,
+    defaultCardsPerPage: cardsPerPage || effectivePreset?.cardsPerPage || 6,
     gapMm: 3,
+    defaultMarginMm: 15,
   });
 
   const chunkSize = metrics.cardsPerPage;
@@ -76,16 +78,15 @@ export const KartuPeserta: React.FC<KartuPesertaProps> = ({
   const sheetStyle = getSheetScreenStyle(metrics.resolved);
 
   return (
-    <div className="w-full flex flex-col items-center">
+    <div className="print-container w-full flex flex-col items-center print:block print:m-0 print:p-0">
       {pages.map((pageStudents, pageIdx) => (
         <div
           key={pageIdx}
+          data-testid="kartu-peserta-page"
           style={sheetStyle}
-          className={`saum-sheet border border-slate-300 shadow-sm ${
-            pageIdx < pages.length - 1 ? 'print-page-break mb-8 print:mb-0' : ''
-          }`}
+          className="saum-sheet print-page border border-slate-300 shadow-sm mb-8 print:mb-0"
         >
-          <div className={`grid grid-cols-2 ${isDense6 ? 'grid-rows-3' : 'grid-rows-2'} gap-[3mm]`}>
+          <div className={isDense6 ? 'print-grid-2x3' : 'print-grid-2x2'}>
             {pageStudents.map((st) => {
               const room = st.ruangId ? roomMap.get(st.ruangId) : undefined;
               const uploadedBarcode = st.barcodeUrl || numberingConfig?.uploadedBarcodeUrl;
@@ -97,10 +98,9 @@ export const KartuPeserta: React.FC<KartuPesertaProps> = ({
                 <div
                   key={st.id}
                   data-testid="kartu-peserta-card"
-                  className={`border-2 border-emerald-800 rounded-lg ${
+                  className={`h-full w-full min-h-0 border-2 border-emerald-800 rounded-lg ${
                     isDense6 ? 'p-2' : 'p-3'
                   } flex flex-col justify-between bg-white relative print:border-emerald-900 print-avoid-break overflow-hidden`}
-                  style={{ height: `${metrics.cardHeightMm}mm` }}
                 >
                   <div className="absolute top-1 left-1 w-1.5 h-1.5 border-t-2 border-l-2 border-emerald-800" />
                   <div className="absolute top-1 right-1 w-1.5 h-1.5 border-t-2 border-r-2 border-emerald-800" />

@@ -103,8 +103,8 @@ export const INITIAL_ROOMS: ExamRoom[] = [];
 export const INITIAL_PHYSICAL_CLASSROOMS: PhysicalClassroom[] = [];
 
 export const INITIAL_PAPER_PRESETS: PaperPreset[] = [
-  { id: 'kartu_peserta', label: 'Kartu Peserta (6/F4)', size: 'F4', orientation: 'portrait', marginTopMm: 6, marginBottomMm: 6, marginLeftMm: 6, marginRightMm: 6, scalePercent: 100, cardsPerPage: 6, fontSizePt: 9.5, lineHeight: 1.25, showKop: false, headerText: '', footerText: '' },
-  { id: 'nomor_meja', label: 'Nomor Meja (6/F4)', size: 'F4', orientation: 'portrait', marginTopMm: 6, marginBottomMm: 6, marginLeftMm: 6, marginRightMm: 6, scalePercent: 100, cardsPerPage: 6, fontSizePt: 10, lineHeight: 1.25, showKop: false, headerText: '', footerText: '' },
+  { id: 'kartu_peserta', label: 'Kartu Peserta (6/F4)', size: 'F4', orientation: 'portrait', marginTopMm: 15, marginBottomMm: 15, marginLeftMm: 15, marginRightMm: 15, scalePercent: 100, cardsPerPage: 6, fontSizePt: 9.5, lineHeight: 1.25, showKop: false, headerText: '', footerText: '' },
+  { id: 'nomor_meja', label: 'Nomor Meja (6/F4)', size: 'F4', orientation: 'portrait', marginTopMm: 15, marginBottomMm: 15, marginLeftMm: 15, marginRightMm: 15, scalePercent: 100, cardsPerPage: 6, fontSizePt: 10, lineHeight: 1.25, showKop: false, headerText: '', footerText: '' },
   { id: 'denah_lokasi', label: 'Denah Lokasi', size: 'A4', orientation: 'landscape', marginTopMm: 8, marginBottomMm: 8, marginLeftMm: 10, marginRightMm: 10, scalePercent: 100, fontSizePt: 10, lineHeight: 1.35, showKop: true, headerText: '', footerText: 'Dokumen Resmi Panitia Ujian Madrasah' },
   { id: 'denah_duduk', label: 'Denah Tempat Duduk', size: 'A4', orientation: 'portrait', marginTopMm: 8, marginBottomMm: 8, marginLeftMm: 10, marginRightMm: 10, scalePercent: 100, fontSizePt: 10, lineHeight: 1.3, showKop: true, headerText: '', footerText: '' },
   { id: 'daftar_hadir', label: 'Daftar Hadir', size: 'A4', orientation: 'portrait', marginTopMm: 8, marginBottomMm: 8, marginLeftMm: 10, marginRightMm: 10, scalePercent: 100, fontSizePt: 10, lineHeight: 1.35, showKop: true, headerText: '', footerText: '' },

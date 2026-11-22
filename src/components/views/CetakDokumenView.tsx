@@ -60,7 +60,8 @@ import { HpDocumentsCetak } from '../documents/HpDocumentsCetak';
 import { JadwalUjianCetak } from '../documents/JadwalUjianCetak';
 import { DnpuCetak } from '../documents/DnpuCetak';
 import { exportStudentsToExcel, extractJenjang } from '../../utils/dnpu';
-import { usePrintLayout } from '../../utils/printLayout';
+import { normalizeTargetPaperPreset, usePrintLayout } from '../../utils/printLayout';
+import { SchedulePrintVersion } from '../../utils/schedulePrint';
 
 interface CetakDokumenViewProps {
   profile: MadrasahProfile;
@@ -116,6 +117,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
   const [selectedSesi, setSelectedSesi] = useState<number>(0);
   const [hpManualBlank, setHpManualBlank] = useState<boolean>(true);
   const [nomorMejaStyle, setNomorMejaStyle] = useState<NomorMejaPrintStyle>('label_lengkap');
+  const [jadwalVersion, setJadwalVersion] = useState<SchedulePrintVersion>('lengkap');
   const ttdFileRef = useRef<HTMLInputElement>(null);
 
   const handleUploadTtdKepala = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -169,16 +171,29 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
     paperPresets.find((p) => p.id === 'default') ||
     paperPresets[0];
 
-  const { layout, setLayout } = usePrintLayout(basePreset, {
+  const targetPresetMode =
+    selectedDoc === 'kartu_peserta'
+      ? 'kartu_peserta'
+      : selectedDoc === 'label_meja'
+      ? 'nomor_meja'
+      : selectedDoc === 'jadwal_ujian'
+      ? 'jadwal_ujian'
+      : 'other';
+
+  const normalizedPreset = useMemo(
+    () => normalizeTargetPaperPreset(targetPresetMode, basePreset),
+    [targetPresetMode, basePreset]
+  );
+
+  const { layout, setLayout } = usePrintLayout(normalizedPreset, {
     size:
-      currentDocMeta.presetKey === 'kartu_peserta' || currentDocMeta.presetKey === 'nomor_meja'
+      targetPresetMode === 'kartu_peserta' ||
+      targetPresetMode === 'nomor_meja' ||
+      targetPresetMode === 'jadwal_ujian'
         ? 'F4'
         : basePreset?.size || 'A4',
     orientation: currentDocMeta.defaultOrientation || basePreset?.orientation || 'portrait',
-    marginMm:
-      currentDocMeta.presetKey === 'kartu_peserta' || currentDocMeta.presetKey === 'nomor_meja'
-        ? 6
-        : undefined,
+    marginMm: targetPresetMode !== 'other' ? 15 : undefined,
   });
 
   const filteredStudents = useMemo(() => {
@@ -306,7 +321,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
               className="px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-semibold"
             >
               <option value="A4">Kertas A4 (210×297)</option>
-              <option value="F4">Kertas F4 (215×330)</option>
+              <option value="F4">Kertas F4 (210×330)</option>
             </select>
             <select
               aria-label="Pilih Orientasi Cepat"
@@ -394,6 +409,44 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
             )}
           </div>
         )}
+        {selectedDoc === 'jadwal_ujian' && (
+          <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-bold text-slate-800">Versi Cetak Jadwal (F4 Landscape 330×210 mm):</span>
+              <div className="inline-flex rounded-lg border border-slate-300 bg-slate-50 p-0.5">
+                <button
+                  type="button"
+                  data-testid="btn-jadwal-lengkap"
+                  onClick={() => setJadwalVersion('lengkap')}
+                  className={`px-3 py-1.5 rounded-md font-bold cursor-pointer transition-colors ${
+                    jadwalVersion === 'lengkap'
+                      ? 'bg-emerald-700 text-white'
+                      : 'text-slate-700 hover:bg-white'
+                  }`}
+                >
+                  Versi 1: Jadwal Lengkap (Admin / Pengawas)
+                </button>
+                <button
+                  type="button"
+                  data-testid="btn-jadwal-siswa"
+                  onClick={() => setJadwalVersion('siswa')}
+                  className={`px-3 py-1.5 rounded-md font-bold cursor-pointer transition-colors ${
+                    jadwalVersion === 'siswa'
+                      ? 'bg-emerald-700 text-white'
+                      : 'text-slate-700 hover:bg-white'
+                  }`}
+                >
+                  Versi 2: Jadwal Siswa
+                </button>
+              </div>
+            </div>
+            <span className="text-[11px] text-slate-500">
+              {jadwalVersion === 'lengkap'
+                ? 'Menampilkan kolom NO, Hari/Tgl, Waktu, Sesi, Mapel, Kode Pengawas, Seragam & Daftar Pengawas.'
+                : 'Khusus peserta/siswa: tanpa kolom Kode Pengawas & Daftar Pengawas.'}
+            </span>
+          </div>
+        )}
       </div>
 
       <PrintToolbar
@@ -401,6 +454,13 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
         layout={layout}
         onLayoutChange={setLayout}
         onSaveLayout={onSavePreset}
+        namedPage={
+          selectedDoc === 'kartu_peserta' || selectedDoc === 'label_meja'
+            ? 'f4_card'
+            : selectedDoc === 'jadwal_ujian'
+            ? 'schedule'
+            : undefined
+        }
         showCardDensity={
           selectedDoc === 'kartu_peserta' ||
           (selectedDoc === 'label_meja' && nomorMejaStyle !== 'daftar_meja')
@@ -491,6 +551,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
             supervisors={supervisors}
             supervisorAssignments={supervisorAssignments}
             paperPreset={layout}
+            version={jadwalVersion}
           />
         )}
 
@@ -658,7 +719,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
         )}
 
         {selectedDoc === 'bundle_semua' && (
-          <div className="space-y-8 flex flex-col items-center print:block print:space-y-0">
+          <div className="bundle-print space-y-8 flex flex-col items-center print:block print:space-y-0">
             <DnpuCetak profile={profile} examConfig={examConfig} students={filteredStudents} rooms={rooms} numberingConfig={numberingConfig} mode="dnpu" paperPreset={layout} />
             <DenahLokasiCetak profile={profile} examConfig={examConfig} physicalClassrooms={physicalClassrooms} rooms={rooms} students={filteredStudents} supervisors={supervisors} paperPreset={layout} />
             <DenahRuangCetak profile={profile} examConfig={examConfig} rooms={rooms} students={filteredStudents} supervisors={supervisors} paperPreset={layout} />

@@ -24,7 +24,74 @@
   margin-right: auto;
 }
 
+.saum-sheet.print-page {
+  height: var(--saum-sheet-h, 330mm);
+  min-height: var(--saum-sheet-h, 330mm);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.print-grid-2x3 {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: 3mm;
+  box-sizing: border-box;
+}
+
+.print-grid-2x2 {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 4mm;
+  box-sizing: border-box;
+}
+
+.print-grid-1x6 {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: repeat(6, minmax(0, 1fr));
+  gap: 3mm;
+  box-sizing: border-box;
+}
+
+.saum-sheet.schedule-print {
+  width: var(--saum-sheet-w, 330mm);
+  min-height: var(--saum-sheet-h, 210mm);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.schedule-table th,
+.schedule-table td {
+  border: 1px solid #000000;
+  vertical-align: middle;
+}
+
 /* Custom Print Rules for Indonesian Official Documents */
+@page f4_card {
+  size: 210mm 330mm portrait;
+  margin: 15mm;
+}
+
+@page schedule {
+  size: 330mm 210mm landscape;
+  margin: 15mm;
+}
+
 @media print {
   @page {
     size: A4 portrait;
@@ -60,6 +127,12 @@
     overflow: visible !important;
   }
 
+  .print-container {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
   .saum-sheet {
     width: 100% !important;
     max-width: 100% !important;
@@ -70,6 +143,47 @@
     box-shadow: none !important;
     border-radius: 0 !important;
     zoom: var(--saum-scale, 1);
+  }
+
+  .saum-sheet.print-page {
+    page: f4_card;
+    width: var(--saum-printable-w, 180mm) !important;
+    height: calc(var(--saum-printable-h, 300mm) - 0.5mm) !important;
+    min-height: 0 !important;
+    max-height: calc(var(--saum-printable-h, 300mm) - 0.5mm) !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    overflow: hidden !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  .saum-sheet.print-page:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+    margin-bottom: 0 !important;
+  }
+
+  .saum-sheet.schedule-print {
+    page: schedule;
+    width: var(--saum-printable-w, 300mm) !important;
+    height: calc(var(--saum-printable-h, 180mm) - 0.5mm) !important;
+    min-height: 0 !important;
+    max-height: calc(var(--saum-printable-h, 180mm) - 0.5mm) !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    overflow: hidden !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+
+  .bundle-print .saum-sheet.schedule-print {
+    page-break-after: always !important;
+    break-after: page !important;
   }
 
   .print-page-break {

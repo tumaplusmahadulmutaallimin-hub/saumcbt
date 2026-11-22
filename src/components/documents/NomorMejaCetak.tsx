@@ -9,7 +9,7 @@ import {
 } from '../../types';
 import { KopSurat } from './KopSurat';
 import { SimpleQRCode, formatIndonesianDate } from '../../utils/qrBarcode';
-import { getCardGridMetrics, getSheetScreenStyle } from '../../utils/printLayout';
+import { getCardGridMetrics, getSheetScreenStyle, normalizeTargetPaperPreset } from '../../utils/printLayout';
 import { formatPersonNameAndTitle } from '../../utils/formatName';
 
 export type NomorMejaPrintStyle =
@@ -50,10 +50,12 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
   const barcodeMode = numberingConfig?.barcodeMode || 'auto';
   const ratio = kursiPerMeja === 1 ? 1 : 2;
 
-  const metrics = getCardGridMetrics(paperPreset, {
+  const effectivePreset = normalizeTargetPaperPreset('nomor_meja', paperPreset);
+  const metrics = getCardGridMetrics(effectivePreset, {
     defaultSize: 'F4',
-    defaultCardsPerPage: cardsPerPage || paperPreset?.cardsPerPage || 6,
+    defaultCardsPerPage: cardsPerPage || effectivePreset?.cardsPerPage || 6,
     gapMm: 3,
+    defaultMarginMm: 15,
   });
   const sheetStyle = getSheetScreenStyle(metrics.resolved);
 
@@ -140,31 +142,28 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
     });
 
     const chunkSize = 6;
-    const rowHeightMm = Math.floor(((metrics.printableHeightMm - 4 * 5 - 2) / 6) * 10) / 10;
     const pages: DeskPair[][] = [];
     for (let i = 0; i < pairs.length; i += chunkSize) {
       pages.push(pairs.slice(i, i + chunkSize));
     }
 
     return (
-      <div className="w-full flex flex-col items-center">
+      <div className="print-container w-full flex flex-col items-center print:block print:m-0 print:p-0">
         {pages.map((pagePairs, pageIdx) => (
           <div
             key={pageIdx}
+            data-testid="nomor-meja-page"
             style={sheetStyle}
-            className={`saum-sheet border border-slate-300 shadow-sm ${
-              pageIdx < pages.length - 1 ? 'print-page-break mb-8 print:mb-0' : ''
-            }`}
+            className="saum-sheet print-page border border-slate-300 shadow-sm mb-8 print:mb-0"
           >
-            <div className="grid grid-cols-1 gap-[4mm]">
+            <div className="print-grid-1x6">
               {pagePairs.map((pair) => {
                 const mejaLabel = String(pair.mejaFisikNo).padStart(2, '0');
                 return (
                   <div
                     key={pair.key}
                     data-testid="nomor-meja-card"
-                    className="border-2 border-dashed border-slate-800 rounded-lg p-2.5 bg-white flex flex-col justify-between print-avoid-break overflow-hidden"
-                    style={{ height: `${rowHeightMm}mm` }}
+                    className="h-full w-full min-h-0 border-2 border-dashed border-slate-800 rounded-lg p-2 bg-white flex flex-col justify-between print-avoid-break overflow-hidden"
                   >
                     <div className="border-b-2 border-emerald-800 pb-1 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
@@ -258,27 +257,23 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
 
   // 2. FORMAT KARTU ANGKA MEJA BESAR (6 kartu per halaman 2 kolom x 3 baris)
   if (printStyle === 'kartu_angka_besar') {
-    const chunkSize = 6;
-    const gridMetrics = getCardGridMetrics(
-      { ...metrics.resolved, cardsPerPage: 6 },
-      { defaultSize: 'F4', defaultCardsPerPage: 6, gapMm: 3 }
-    );
+    const chunkSize = metrics.cardsPerPage;
+    const isDense6 = chunkSize === 6;
     const pages: Student[][] = [];
     for (let i = 0; i < filteredStudents.length; i += chunkSize) {
       pages.push(filteredStudents.slice(i, i + chunkSize));
     }
 
     return (
-      <div className="w-full flex flex-col items-center">
+      <div className="print-container w-full flex flex-col items-center print:block print:m-0 print:p-0">
         {pages.map((pageStudents, pageIdx) => (
           <div
             key={pageIdx}
+            data-testid="nomor-meja-page"
             style={sheetStyle}
-            className={`saum-sheet border border-slate-300 shadow-sm ${
-              pageIdx < pages.length - 1 ? 'print-page-break mb-8 print:mb-0' : ''
-            }`}
+            className="saum-sheet print-page border border-slate-300 shadow-sm mb-8 print:mb-0"
           >
-            <div className="grid grid-cols-2 grid-rows-3 gap-[3mm]">
+            <div className={isDense6 ? 'print-grid-2x3' : 'print-grid-2x2'}>
               {pageStudents.map((st, idx) => {
                 const room = st.ruangId ? roomMap.get(st.ruangId) : undefined;
                 const seatNum = st.nomorMeja || idx + 1;
@@ -288,8 +283,7 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
                   <div
                     key={st.id}
                     data-testid="nomor-meja-card"
-                    className="border-2 border-slate-900 rounded-xl p-3 bg-white flex flex-col justify-between text-center print-avoid-break overflow-hidden"
-                    style={{ height: `${gridMetrics.cardHeightMm}mm` }}
+                    className="h-full w-full min-h-0 border-2 border-slate-900 rounded-xl p-2.5 bg-white flex flex-col justify-between text-center print-avoid-break overflow-hidden"
                   >
                     <div className="border-b-2 border-emerald-800 pb-1.5">
                       <p className="text-[8px] font-bold uppercase text-slate-500 truncate">
@@ -431,22 +425,22 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
 
   // 4. DEFAULT: LABEL NOMOR MEJA & DATA PESERTA LENGKAP (6 kartu per lembar F4 = 2 kolom x 3 baris)
   const chunkSize = metrics.cardsPerPage;
+  const isDense6 = chunkSize === 6;
   const pages: Student[][] = [];
   for (let i = 0; i < filteredStudents.length; i += chunkSize) {
     pages.push(filteredStudents.slice(i, i + chunkSize));
   }
 
   return (
-    <div className="w-full flex flex-col items-center">
+    <div className="print-container w-full flex flex-col items-center print:block print:m-0 print:p-0">
       {pages.map((pageStudents, pageIdx) => (
         <div
           key={pageIdx}
+          data-testid="nomor-meja-page"
           style={sheetStyle}
-          className={`saum-sheet border border-slate-300 shadow-sm ${
-            pageIdx < pages.length - 1 ? 'print-page-break mb-8 print:mb-0' : ''
-          }`}
+          className="saum-sheet print-page border border-slate-300 shadow-sm mb-8 print:mb-0"
         >
-          <div className={`grid grid-cols-2 ${chunkSize === 6 ? 'grid-rows-3' : 'grid-rows-2'} gap-[3mm]`}>
+          <div className={isDense6 ? 'print-grid-2x3' : 'print-grid-2x2'}>
             {pageStudents.map((st) => {
               const room = st.ruangId ? roomMap.get(st.ruangId) : undefined;
               const uploadedBarcode = st.barcodeUrl || numberingConfig?.uploadedBarcodeUrl;
@@ -460,8 +454,7 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
                 <div
                   key={st.id}
                   data-testid="nomor-meja-card"
-                  className="border-2 border-dashed border-slate-800 rounded-lg p-2.5 bg-white flex flex-col justify-between print-avoid-break overflow-hidden"
-                  style={{ height: `${metrics.cardHeightMm}mm` }}
+                  className="h-full w-full min-h-0 border-2 border-dashed border-slate-800 rounded-lg p-2 bg-white flex flex-col justify-between print-avoid-break overflow-hidden"
                 >
                   <div className="border-b-2 border-emerald-800 pb-1 flex items-center justify-between gap-2">
                     <div className="min-w-0">

@@ -25,6 +25,7 @@ interface PrintToolbarProps {
   showCardDensity?: boolean;
   showKopToggle?: boolean;
   isSticky?: boolean;
+  namedPage?: 'f4_card' | 'schedule';
 }
 
 export const PrintToolbar: React.FC<PrintToolbarProps> = ({
@@ -41,6 +42,7 @@ export const PrintToolbar: React.FC<PrintToolbarProps> = ({
   showCardDensity = false,
   showKopToggle = false,
   isSticky = true,
+  namedPage,
 }) => {
   const [localLayout, setLocalLayout] = useState<PaperPreset>(() =>
     resolvePaperPreset(layout, {
@@ -99,11 +101,18 @@ export const PrintToolbar: React.FC<PrintToolbarProps> = ({
 
   const pageCssSize =
     effective.size === 'F4'
-      ? `215mm 330mm ${effective.orientation}`
+      ? `210mm 330mm ${effective.orientation}`
       : `A4 ${effective.orientation}`;
 
   const scaleInfo =
     (effective.scalePercent ?? 100) !== 100 ? ` • Skala ${effective.scalePercent}%` : '';
+
+  const namedPageRule = namedPage
+    ? `@page ${namedPage} {
+            size: ${pageCssSize};
+            margin: ${effective.marginTopMm}mm ${effective.marginRightMm}mm ${effective.marginBottomMm}mm ${effective.marginLeftMm}mm;
+          }`
+    : '';
 
   return (
     <>
@@ -113,6 +122,7 @@ export const PrintToolbar: React.FC<PrintToolbarProps> = ({
             size: ${pageCssSize};
             margin: ${effective.marginTopMm}mm ${effective.marginRightMm}mm ${effective.marginBottomMm}mm ${effective.marginLeftMm}mm;
           }
+          ${namedPageRule}
         }
       `}</style>
       <div
@@ -196,7 +206,7 @@ export const PrintToolbar: React.FC<PrintToolbarProps> = ({
                 className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
               >
                 <option value="A4">A4 (210 × 297 mm)</option>
-                <option value="F4">F4 / Folio (215 × 330 mm)</option>
+                <option value="F4">F4 / Folio (210 × 330 mm)</option>
               </select>
             </div>
 
@@ -292,18 +302,26 @@ export const PrintToolbar: React.FC<PrintToolbarProps> = ({
                 <button
                   type="button"
                   onClick={() => applyQuickMargins(5, 5, 5, 5)}
-                  className="flex-1 px-2 py-1 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded cursor-pointer"
-                  title="Maksimalkan area isi kertas (margin 5mm)"
+                  className="flex-1 px-1.5 py-1 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded cursor-pointer"
+                  title="Margin minimal 5mm"
                 >
-                  Penuh 5mm
+                  5mm
                 </button>
                 <button
                   type="button"
                   onClick={() => applyQuickMargins(10, 10, 10, 10)}
-                  className="flex-1 px-2 py-1 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded cursor-pointer"
+                  className="flex-1 px-1.5 py-1 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded cursor-pointer"
                   title="Margin standar 10mm"
                 >
                   10mm
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyQuickMargins(15, 15, 15, 15)}
+                  className="flex-1 px-1.5 py-1 text-[11px] font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded cursor-pointer"
+                  title="Margin resmi F4 15mm (1.5 cm) semua sisi"
+                >
+                  15mm
                 </button>
               </div>
               {onSaveLayout && (

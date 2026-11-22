@@ -20,7 +20,7 @@ import {
 import { compareClasses } from '../../utils/numbering';
 import { NomorMejaCetak, NomorMejaPrintStyle } from '../documents/NomorMejaCetak';
 import { PrintToolbar } from '../documents/PrintToolbar';
-import { usePrintLayout } from '../../utils/printLayout';
+import { normalizeTargetPaperPreset, usePrintLayout } from '../../utils/printLayout';
 
 interface NomorMejaViewProps {
   profile: MadrasahProfile;
@@ -56,10 +56,14 @@ export const NomorMejaView: React.FC<NomorMejaViewProps> = ({
   const [hasUnsaved, setHasUnsaved] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [notice, setNotice] = useState<string>('');
-  const { layout, setLayout } = usePrintLayout(paperPreset, {
+  const normalizedDeskPreset = useMemo(
+    () => normalizeTargetPaperPreset('nomor_meja', paperPreset),
+    [paperPreset]
+  );
+  const { layout, setLayout } = usePrintLayout(normalizedDeskPreset, {
     size: 'F4',
     orientation: 'portrait',
-    marginMm: 6,
+    marginMm: 15,
   });
 
   useEffect(() => {
@@ -341,8 +345,9 @@ export const NomorMejaView: React.FC<NomorMejaViewProps> = ({
           layout={layout}
           onLayoutChange={setLayout}
           onSaveLayout={onSavePreset}
+          namedPage="f4_card"
           defaultOpenLayout={true}
-          showCardDensity={printStyle === 'label_lengkap'}
+          showCardDensity={printStyle === 'label_lengkap' || printStyle === 'kartu_angka_besar'}
           showKopToggle={printStyle === 'daftar_meja'}
           isSticky={false}
         />

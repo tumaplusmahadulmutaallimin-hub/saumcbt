@@ -26,7 +26,8 @@ import { validateScheduleConflicts } from '../../utils/seating';
 import { extractJenjang } from '../../utils/dnpu';
 import { JadwalUjianCetak } from '../documents/JadwalUjianCetak';
 import { PrintToolbar } from '../documents/PrintToolbar';
-import { usePrintLayout } from '../../utils/printLayout';
+import { normalizeTargetPaperPreset, usePrintLayout } from '../../utils/printLayout';
+import { SchedulePrintVersion } from '../../utils/schedulePrint';
 
 interface JadwalMapelViewProps {
   profile: MadrasahProfile;
@@ -65,10 +66,15 @@ export const JadwalMapelView: React.FC<JadwalMapelViewProps> = ({
   const [showPrint, setShowPrint] = useState(false);
   const [showUniformModal, setShowUniformModal] = useState(false);
   const [showAddScheduleForm, setShowAddScheduleForm] = useState(false);
-  const { layout, setLayout } = usePrintLayout(paperPreset, {
-    size: 'A4',
+  const [jadwalPrintVersion, setJadwalPrintVersion] = useState<SchedulePrintVersion>('lengkap');
+  const normalizedSchedulePreset = useMemo(
+    () => normalizeTargetPaperPreset('jadwal_ujian', paperPreset),
+    [paperPreset]
+  );
+  const { layout, setLayout } = usePrintLayout(normalizedSchedulePreset, {
+    size: 'F4',
     orientation: 'landscape',
-    marginMm: 8,
+    marginMm: 15,
   });
 
   const classes = useMemo(() => {
@@ -279,11 +285,42 @@ export const JadwalMapelView: React.FC<JadwalMapelViewProps> = ({
     return (
       <div className="space-y-4">
         <PrintToolbar
-          title="Cetak Jadwal Ujian Per Kelas & Ketentuan Seragam"
+          title={
+            jadwalPrintVersion === 'lengkap'
+              ? 'Cetak Jadwal Lengkap (Admin / Pengawas)'
+              : 'Cetak Jadwal Ujian (Versi Siswa)'
+          }
           onBack={() => setShowPrint(false)}
           layout={layout}
           onLayoutChange={setLayout}
           onSaveLayout={onSavePreset}
+          namedPage="schedule"
+          extraControls={
+            <div className="inline-flex rounded-lg border border-slate-300 bg-slate-50 p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setJadwalPrintVersion('lengkap')}
+                className={`px-2.5 py-1.5 rounded-md font-bold cursor-pointer whitespace-nowrap ${
+                  jadwalPrintVersion === 'lengkap'
+                    ? 'bg-emerald-700 text-white'
+                    : 'text-slate-700 hover:bg-white'
+                }`}
+              >
+                Versi 1: Lengkap (Pengawas)
+              </button>
+              <button
+                type="button"
+                onClick={() => setJadwalPrintVersion('siswa')}
+                className={`px-2.5 py-1.5 rounded-md font-bold cursor-pointer whitespace-nowrap ${
+                  jadwalPrintVersion === 'siswa'
+                    ? 'bg-emerald-700 text-white'
+                    : 'text-slate-700 hover:bg-white'
+                }`}
+              >
+                Versi 2: Jadwal Siswa
+              </button>
+            </div>
+          }
         />
         <div className="overflow-x-auto pb-8 print:overflow-visible print:pb-0">
           <JadwalUjianCetak
@@ -295,6 +332,7 @@ export const JadwalMapelView: React.FC<JadwalMapelViewProps> = ({
             supervisors={supervisors}
             supervisorAssignments={supervisorAssignments}
             paperPreset={layout}
+            version={jadwalPrintVersion}
           />
         </div>
       </div>

@@ -22,7 +22,7 @@ export function getPaperDimensionsMm(
   size: PaperSize = 'A4',
   orientation: PaperOrientation = 'portrait'
 ): { widthMm: number; heightMm: number } {
-  const baseW = size === 'F4' ? 215 : 210;
+  const baseW = 210; // Both A4 (210x297) and Indonesian F4 (210x330) have 210mm base width
   const baseH = size === 'F4' ? 330 : 297;
   return orientation === 'landscape'
     ? { widthMm: baseH, heightMm: baseW }
@@ -48,10 +48,63 @@ export function resolvePaperPreset(
 }
 
 /**
- * Generates CSS variables and preview sizing for `.saum-sheet`.
- * On screen: shows exact paper size (`210mm`, `215mm`, `297mm`, `330mm`) with exact 4-side padding.
- * On `@media print`: CSS sets `width: 100% !important; min-height: 0 !important; padding: 0 !important;`
- * while `@page { size: ...; margin: <top> <right> <bottom> <left>; }` applies physical printer margins.
+ * Normalizes preset defaults for F4 card & F4 landscape schedule views so legacy 6mm/8mm
+ * unmodified DB defaults smoothly upgrade to exact 15mm (1.5 cm) standard margins without mutating DB.
+ */
+export function normalizeTargetPaperPreset(
+  target: 'kartu_peserta' | 'nomor_meja' | 'jadwal_ujian' | 'other',
+  preset?: Partial<PaperPreset>
+): PaperPreset | undefined {
+  if (target === 'kartu_peserta' || target === 'nomor_meja') {
+    const isLegacy6mm =
+      !preset ||
+      (preset.size === 'F4' &&
+        preset.orientation === 'portrait' &&
+        preset.marginTopMm === 6 &&
+        preset.marginRightMm === 6 &&
+        preset.marginBottomMm === 6 &&
+        preset.marginLeftMm === 6);
+    if (isLegacy6mm) {
+      return {
+        ...FALLBACK_PAPER_PRESET,
+        ...(preset || {}),
+        id: target,
+        size: 'F4',
+        orientation: 'portrait',
+        marginTopMm: 15,
+        marginRightMm: 15,
+        marginBottomMm: 15,
+        marginLeftMm: 15,
+        cardsPerPage: preset?.cardsPerPage || 6,
+      };
+    }
+    return preset as PaperPreset;
+  }
+
+  if (target === 'jadwal_ujian') {
+    return {
+      ...FALLBACK_PAPER_PRESET,
+      ...(preset || {}),
+      id: 'default',
+      label: 'Jadwal Ujian (F4 Landscape)',
+      size: 'F4',
+      orientation: 'landscape',
+      marginTopMm: 15,
+      marginRightMm: 15,
+      marginBottomMm: 15,
+      marginLeftMm: 15,
+      scalePercent: 100,
+      showKop: preset?.showKop ?? true,
+    };
+  }
+
+  return preset as PaperPreset | undefined;
+}
+
+/**
+ * Generates CSS variables and preview sizing for `.saum-sheet`, `.print-page`, and `.schedule-print`.
+ * On screen: shows exact paper size (`210 × 330 mm` F4 Portrait or `330 × 210 mm` F4 Landscape) with exact 4-side padding.
+ * On `@media print`: `@page` provides physical printer margins (`15mm` default) and inner container fills exact printable area.
  */
 export function getSheetScreenStyle(
   preset?: Partial<PaperPreset>,
@@ -59,11 +112,15 @@ export function getSheetScreenStyle(
 ): React.CSSProperties {
   const resolved = resolvePaperPreset(preset, fallback);
   const { widthMm, heightMm } = getPaperDimensionsMm(resolved.size, resolved.orientation);
+  const printableWidthMm = Math.max(80, widthMm - resolved.marginLeftMm - resolved.marginRightMm);
+  const printableHeightMm = Math.max(80, heightMm - resolved.marginTopMm - resolved.marginBottomMm);
   const scale = (resolved.scalePercent ?? 100) / 100;
 
   return {
     ['--saum-sheet-w' as string]: `${widthMm}mm`,
     ['--saum-sheet-h' as string]: `${heightMm}mm`,
+    ['--saum-printable-w' as string]: `${printableWidthMm}mm`,
+    ['--saum-printable-h' as string]: `${printableHeightMm}mm`,
     ['--saum-pt' as string]: `${resolved.marginTopMm}mm`,
     ['--saum-pr' as string]: `${resolved.marginRightMm}mm`,
     ['--saum-pb' as string]: `${resolved.marginBottomMm}mm`,
@@ -75,16 +132,16 @@ export function getSheetScreenStyle(
 }
 
 /**
- * Computes exact printable card height for 2-column grids (e.g. 6 cards on F4 = 2 cols x 3 rows)
- * so 6 cards neatly fill the full sheet between top and bottom margins without spilling to page 2.
+ * Computes exact printable card height for 2-column grids (6 cards on F4 210x330mm with 15mm margins = 180x300mm).
  */
 export function getCardGridMetrics(
   preset?: Partial<PaperPreset>,
-  options?: { defaultSize?: PaperSize; defaultCardsPerPage?: 4 | 6; gapMm?: number }
+  options?: { defaultSize?: PaperSize; defaultCardsPerPage?: 4 | 6; gapMm?: number; defaultMarginMm?: number }
 ): {
   resolved: PaperPreset;
   cardsPerPage: 4 | 6;
   rows: 2 | 3;
+  gapMm: number;
   cardHeightMm: number;
   printableWidthMm: number;
   printableHeightMm: number;
@@ -92,7 +149,7 @@ export function getCardGridMetrics(
   const resolved = resolvePaperPreset(preset, {
     size: options?.defaultSize || 'F4',
     orientation: 'portrait',
-    marginMm: 6,
+    marginMm: options?.defaultMarginMm ?? 15,
   });
   const { widthMm, heightMm } = getPaperDimensionsMm(resolved.size, resolved.orientation);
   const printableWidthMm = Math.max(120, widthMm - resolved.marginLeftMm - resolved.marginRightMm);
@@ -103,14 +160,14 @@ export function getCardGridMetrics(
     options?.defaultCardsPerPage ||
     (resolved.size === 'F4' ? 6 : 4);
   const rows: 2 | 3 = cardsPerPage === 6 ? 3 : 2;
-  const gapMm = options?.gapMm ?? 4;
-  // Reserve ~1.5mm safety buffer so browser rounding never spills the 3rd row to the next page
-  const cardHeightMm = Math.floor(((printableHeightMm - gapMm * (rows - 1) - 2) / rows) * 10) / 10;
+  const gapMm = options?.gapMm ?? 3;
+  const cardHeightMm = Math.floor(((printableHeightMm - gapMm * (rows - 1)) / rows) * 10) / 10;
 
   return {
     resolved,
     cardsPerPage,
     rows,
+    gapMm,
     cardHeightMm,
     printableWidthMm,
     printableHeightMm,
@@ -134,8 +191,10 @@ export function usePrintLayout(
     initialPreset?.marginLeftMm,
     initialPreset?.scalePercent,
     initialPreset?.cardsPerPage,
+    initialPreset?.showKop,
     fallback?.size,
     fallback?.orientation,
+    fallback?.marginMm,
   ].join('|');
 
   useEffect(() => {
