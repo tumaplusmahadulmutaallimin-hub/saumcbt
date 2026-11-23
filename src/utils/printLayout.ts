@@ -29,6 +29,21 @@ export function getPaperDimensionsMm(
     : { widthMm: baseW, heightMm: baseH };
 }
 
+/**
+ * Generates valid CSS Paged Media `@page { size: ... }` value.
+ * CSS spec forbids combining explicit lengths with `portrait`/`landscape` keywords,
+ * so F4 swaps width/height (`210mm 330mm` vs `330mm 210mm`).
+ */
+export function getPageCssSize(
+  size: PaperSize = 'A4',
+  orientation: PaperOrientation = 'portrait'
+): string {
+  if (size === 'F4') {
+    return orientation === 'landscape' ? '330mm 210mm' : '210mm 330mm';
+  }
+  return orientation === 'landscape' ? 'A4 landscape' : 'A4 portrait';
+}
+
 export function resolvePaperPreset(
   preset?: Partial<PaperPreset>,
   fallback?: { size?: PaperSize; orientation?: PaperOrientation; marginMm?: number }
@@ -132,14 +147,16 @@ export function getSheetScreenStyle(
 }
 
 /**
- * Computes exact printable card height for 2-column grids (6 cards on F4 210x330mm with 15mm margins = 180x300mm).
+ * Computes exact printable card height for 2-column portrait (2x3) or 3-column landscape (3x2) grids.
  */
 export function getCardGridMetrics(
   preset?: Partial<PaperPreset>,
   options?: { defaultSize?: PaperSize; defaultCardsPerPage?: 4 | 6; gapMm?: number; defaultMarginMm?: number }
 ): {
   resolved: PaperPreset;
+  isLandscape: boolean;
   cardsPerPage: 4 | 6;
+  cols: 2 | 3;
   rows: 2 | 3;
   gapMm: number;
   cardHeightMm: number;
@@ -151,21 +168,25 @@ export function getCardGridMetrics(
     orientation: 'portrait',
     marginMm: options?.defaultMarginMm ?? 15,
   });
+  const isLandscape = resolved.orientation === 'landscape';
   const { widthMm, heightMm } = getPaperDimensionsMm(resolved.size, resolved.orientation);
-  const printableWidthMm = Math.max(120, widthMm - resolved.marginLeftMm - resolved.marginRightMm);
-  const printableHeightMm = Math.max(180, heightMm - resolved.marginTopMm - resolved.marginBottomMm);
+  const printableWidthMm = Math.max(80, widthMm - resolved.marginLeftMm - resolved.marginRightMm);
+  const printableHeightMm = Math.max(80, heightMm - resolved.marginTopMm - resolved.marginBottomMm);
 
   const cardsPerPage: 4 | 6 =
     resolved.cardsPerPage ||
     options?.defaultCardsPerPage ||
     (resolved.size === 'F4' ? 6 : 4);
-  const rows: 2 | 3 = cardsPerPage === 6 ? 3 : 2;
+  const cols: 2 | 3 = isLandscape && cardsPerPage === 6 ? 3 : 2;
+  const rows: 2 | 3 = isLandscape ? 2 : cardsPerPage === 6 ? 3 : 2;
   const gapMm = options?.gapMm ?? 3;
   const cardHeightMm = Math.floor(((printableHeightMm - gapMm * (rows - 1)) / rows) * 10) / 10;
 
   return {
     resolved,
+    isLandscape,
     cardsPerPage,
+    cols,
     rows,
     gapMm,
     cardHeightMm,

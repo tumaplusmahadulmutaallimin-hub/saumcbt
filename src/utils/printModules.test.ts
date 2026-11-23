@@ -4,6 +4,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
   getCardGridMetrics,
+  getPageCssSize,
   getPaperDimensionsMm,
   getSheetScreenStyle,
   normalizeTargetPaperPreset,
@@ -15,6 +16,7 @@ import { KartuPeserta } from '../components/documents/KartuPeserta';
 import { NomorMejaCetak } from '../components/documents/NomorMejaCetak';
 import { JadwalUjianCetak } from '../components/documents/JadwalUjianCetak';
 import { DenahLokasiCetak } from '../components/documents/DenahLokasiCetak';
+import { PrintToolbar } from '../components/documents/PrintToolbar';
 import {
   ExamConfig,
   ExamRoom,
@@ -509,4 +511,120 @@ test('Printable documents use block print-container and preserve screen colors w
   assert.ok(jadwalHtml.includes('print-container w-full block'));
   assert.ok(jadwalHtml.includes('schedule-print'));
 });
+
+test('getPageCssSize, PrintToolbar, and index.css emit valid CSS Paged Media sizes for F4/A4 portrait & landscape (never invalid length+orientation)', () => {
+  assert.equal(getPageCssSize('F4', 'portrait'), '210mm 330mm');
+  assert.equal(getPageCssSize('F4', 'landscape'), '330mm 210mm');
+  assert.equal(getPageCssSize('A4', 'portrait'), 'A4 portrait');
+  assert.equal(getPageCssSize('A4', 'landscape'), 'A4 landscape');
+
+  const indexCss = fs.readFileSync(path.resolve(process.cwd(), 'src/index.css'), 'utf8');
+  assert.equal(indexCss.includes('210mm 330mm portrait'), false);
+  assert.equal(indexCss.includes('210mm 330mm landscape'), false);
+  assert.equal(indexCss.includes('330mm 210mm landscape'), false);
+  assert.ok(indexCss.includes('size: 210mm 330mm;'));
+  assert.ok(indexCss.includes('size: 330mm 210mm;'));
+  assert.ok(indexCss.includes('.print-grid-3x2'));
+  assert.ok(indexCss.includes('height: calc(var(--saum-printable-h, 300mm) - 2mm) !important;'));
+
+  const toolbarF4Landscape = renderToStaticMarkup(
+    React.createElement(PrintToolbar, {
+      title: 'Test Landscape F4',
+      namedPage: 'schedule',
+      layout: {
+        id: 'default',
+        label: 'Jadwal',
+        size: 'F4',
+        orientation: 'landscape',
+        marginTopMm: 15,
+        marginRightMm: 15,
+        marginBottomMm: 15,
+        marginLeftMm: 15,
+        scalePercent: 100,
+        fontSizePt: 10,
+        lineHeight: 1.3,
+        showKop: true,
+        headerText: '',
+        footerText: '',
+      },
+    })
+  );
+  assert.ok(toolbarF4Landscape.includes('size: 330mm 210mm;'));
+  assert.equal(toolbarF4Landscape.includes('210mm 330mm landscape'), false);
+  assert.equal(toolbarF4Landscape.includes('@media print'), false);
+});
+
+test('KartuPeserta and NomorMejaCetak pack 6 cards cleanly into 1 sheet in both Landscape (3x2) and A4 Portrait (2x3 compact)', () => {
+  const students6 = makeStudents(6);
+
+  const landscapeF4Preset: PaperPreset = {
+    id: 'kartu_peserta',
+    label: 'Kartu Landscape',
+    size: 'F4',
+    orientation: 'landscape',
+    marginTopMm: 15,
+    marginRightMm: 15,
+    marginBottomMm: 15,
+    marginLeftMm: 15,
+    scalePercent: 100,
+    cardsPerPage: 6,
+    fontSizePt: 9.5,
+    lineHeight: 1.25,
+    showKop: false,
+    headerText: '',
+    footerText: '',
+  };
+
+  const kartuLandscapeHtml = renderToStaticMarkup(
+    React.createElement(KartuPeserta, {
+      profile: mockProfile,
+      examConfig: mockExamConfig,
+      students: students6,
+      rooms: mockRooms,
+      numberingConfig: mockNumbering,
+      paperPreset: landscapeF4Preset,
+    })
+  );
+  assert.equal(countOccurrences(kartuLandscapeHtml, 'data-testid="kartu-peserta-page"'), 1);
+  assert.equal(countOccurrences(kartuLandscapeHtml, 'data-testid="kartu-peserta-card"'), 6);
+  assert.ok(kartuLandscapeHtml.includes('print-grid-3x2'));
+  assert.ok(kartuLandscapeHtml.includes('--saum-sheet-w:330mm'));
+  assert.ok(kartuLandscapeHtml.includes('--saum-sheet-h:210mm'));
+
+  const mejaLandscapeHtml = renderToStaticMarkup(
+    React.createElement(NomorMejaCetak, {
+      profile: mockProfile,
+      examConfig: mockExamConfig,
+      students: students6,
+      rooms: mockRooms,
+      numberingConfig: mockNumbering,
+      printStyle: 'label_lengkap',
+      paperPreset: landscapeF4Preset,
+    })
+  );
+  assert.equal(countOccurrences(mejaLandscapeHtml, 'data-testid="nomor-meja-page"'), 1);
+  assert.equal(countOccurrences(mejaLandscapeHtml, 'data-testid="nomor-meja-card"'), 6);
+  assert.ok(mejaLandscapeHtml.includes('print-grid-3x2'));
+
+  const a4Portrait6Preset: PaperPreset = {
+    ...landscapeF4Preset,
+    size: 'A4',
+    orientation: 'portrait',
+  };
+  const kartuA4Html = renderToStaticMarkup(
+    React.createElement(KartuPeserta, {
+      profile: mockProfile,
+      examConfig: mockExamConfig,
+      students: students6,
+      rooms: mockRooms,
+      numberingConfig: mockNumbering,
+      paperPreset: a4Portrait6Preset,
+    })
+  );
+  assert.equal(countOccurrences(kartuA4Html, 'data-testid="kartu-peserta-page"'), 1);
+  assert.equal(countOccurrences(kartuA4Html, 'data-testid="kartu-peserta-card"'), 6);
+  assert.ok(kartuA4Html.includes('print-grid-2x3'));
+  assert.ok(kartuA4Html.includes('p-1.5'));
+});
+
 

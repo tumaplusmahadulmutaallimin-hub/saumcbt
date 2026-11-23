@@ -45,6 +45,18 @@
   box-sizing: border-box;
 }
 
+.print-grid-3x2 {
+  width: 100%;
+  height: 100%;
+  flex: 1 1 0%;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 3mm;
+  box-sizing: border-box;
+}
+
 .print-grid-2x2 {
   width: 100%;
   height: 100%;
@@ -88,14 +100,19 @@
   vertical-align: middle;
 }
 
-/* Custom Print Rules for Indonesian Official Documents */
+/* Custom Print Rules for Indonesian Official Documents (top-level valid CSS Paged Media) */
+@page {
+  size: A4 portrait;
+  margin: 8mm 10mm;
+}
+
 @page f4_card {
-  size: 210mm 330mm portrait;
+  size: 210mm 330mm;
   margin: 15mm;
 }
 
 @page schedule {
-  size: 330mm 210mm landscape;
+  size: 330mm 210mm;
   margin: 15mm;
 }
 
@@ -105,10 +122,6 @@
 }
 
 @media print {
-  @page {
-    size: A4 portrait;
-    margin: 8mm 10mm;
-  }
 
   html,
   body {
@@ -167,10 +180,11 @@
 
   .saum-sheet.print-page {
     page: f4_card;
-    width: var(--saum-printable-w, 180mm) !important;
-    height: calc(var(--saum-printable-h, 300mm) - 0.5mm) !important;
+    display: block !important;
+    width: calc(var(--saum-printable-w, 180mm) - 0.5mm) !important;
+    height: calc(var(--saum-printable-h, 300mm) - 2mm) !important;
     min-height: 0 !important;
-    max-height: calc(var(--saum-printable-h, 300mm) - 0.5mm) !important;
+    max-height: calc(var(--saum-printable-h, 300mm) - 2mm) !important;
     padding: 0 !important;
     margin: 0 auto !important;
     overflow: hidden !important;
@@ -178,6 +192,14 @@
     break-inside: avoid !important;
     page-break-after: always !important;
     break-after: page !important;
+  }
+
+  .saum-sheet.print-page > .print-grid-2x3,
+  .saum-sheet.print-page > .print-grid-3x2,
+  .saum-sheet.print-page > .print-grid-2x2,
+  .saum-sheet.print-page > .print-grid-1x6 {
+    width: 100% !important;
+    height: 100% !important;
   }
 
   .saum-sheet.print-page:last-child {

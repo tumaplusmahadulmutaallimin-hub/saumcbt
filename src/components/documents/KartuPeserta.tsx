@@ -55,6 +55,12 @@ export const KartuPeserta: React.FC<KartuPesertaProps> = ({
 
   const chunkSize = metrics.cardsPerPage;
   const isDense6 = chunkSize === 6;
+  const isCompactCard = isDense6 && (metrics.isLandscape || metrics.cardHeightMm < 92);
+  const gridClass = isDense6
+    ? metrics.isLandscape
+      ? 'print-grid-3x2'
+      : 'print-grid-2x3'
+    : 'print-grid-2x2';
   const pages: Student[][] = [];
   for (let i = 0; i < filtered.length; i += chunkSize) {
     pages.push(filtered.slice(i, i + chunkSize));
@@ -86,7 +92,7 @@ export const KartuPeserta: React.FC<KartuPesertaProps> = ({
           style={sheetStyle}
           className="saum-sheet print-page border border-slate-300 shadow-sm mb-8 print:mb-0"
         >
-          <div className={isDense6 ? 'print-grid-2x3' : 'print-grid-2x2'}>
+          <div className={gridClass}>
             {pageStudents.map((st) => {
               const room = st.ruangId ? roomMap.get(st.ruangId) : undefined;
               const uploadedBarcode = st.barcodeUrl || numberingConfig?.uploadedBarcodeUrl;
@@ -99,7 +105,7 @@ export const KartuPeserta: React.FC<KartuPesertaProps> = ({
                   key={st.id}
                   data-testid="kartu-peserta-card"
                   className={`h-full w-full min-h-0 border-2 border-emerald-800 rounded-lg ${
-                    isDense6 ? 'p-2' : 'p-3'
+                    isCompactCard ? 'p-1.5' : isDense6 ? 'p-2' : 'p-3'
                   } flex flex-col justify-between bg-white relative print-avoid-break overflow-hidden`}
                 >
                   <div className="absolute top-1 left-1 w-1.5 h-1.5 border-t-2 border-l-2 border-emerald-800" />
@@ -136,7 +142,11 @@ export const KartuPeserta: React.FC<KartuPesertaProps> = ({
                       <div className="flex-shrink-0 flex flex-col items-center">
                         <div
                           className={`${
-                            isDense6 ? 'w-[20mm] h-[25.5mm]' : 'w-[23mm] h-[30mm]'
+                            isCompactCard
+                              ? 'w-[18mm] h-[23mm]'
+                              : isDense6
+                              ? 'w-[20mm] h-[25.5mm]'
+                              : 'w-[23mm] h-[30mm]'
                           } border border-slate-400 bg-slate-50 flex flex-col items-center justify-center p-1 relative rounded-xs`}
                         >
                           {st.fotoUrl ? (
@@ -264,8 +274,8 @@ export const KartuPeserta: React.FC<KartuPesertaProps> = ({
                       ) : (
                         <SimpleBarcode
                           value={st.nomorPeserta || '26-01-000'}
-                          height={isDense6 ? 30 : 34}
-                          width={isDense6 ? 146 : 162}
+                          height={isCompactCard ? 26 : isDense6 ? 30 : 34}
+                          width={isCompactCard ? 136 : isDense6 ? 146 : 162}
                         />
                       )}
                     </div>
@@ -278,7 +288,7 @@ export const KartuPeserta: React.FC<KartuPesertaProps> = ({
                       <p className="font-bold text-[8px]">Kepala Madrasah,</p>
                       <div
                         className={`${
-                          isDense6 ? 'h-[26px]' : 'h-[32px]'
+                          isCompactCard ? 'h-[22px]' : isDense6 ? 'h-[26px]' : 'h-[32px]'
                         } flex items-center justify-center my-0.5`}
                       >
                         {profile.ttdKepalaUrl ? (

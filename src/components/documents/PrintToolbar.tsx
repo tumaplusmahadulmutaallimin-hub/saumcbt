@@ -9,7 +9,7 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { PaperOrientation, PaperPreset, PaperSize } from '../../types';
-import { resolvePaperPreset } from '../../utils/printLayout';
+import { getPageCssSize, resolvePaperPreset } from '../../utils/printLayout';
 
 interface PrintToolbarProps {
   title: string;
@@ -99,31 +99,26 @@ export const PrintToolbar: React.FC<PrintToolbarProps> = ({
     window.print();
   };
 
-  const pageCssSize =
-    effective.size === 'F4'
-      ? `210mm 330mm ${effective.orientation}`
-      : `A4 ${effective.orientation}`;
+  const pageCssSize = getPageCssSize(effective.size, effective.orientation);
 
   const scaleInfo =
     (effective.scalePercent ?? 100) !== 100 ? ` • Skala ${effective.scalePercent}%` : '';
 
   const namedPageRule = namedPage
     ? `@page ${namedPage} {
-            size: ${pageCssSize};
-            margin: ${effective.marginTopMm}mm ${effective.marginRightMm}mm ${effective.marginBottomMm}mm ${effective.marginLeftMm}mm;
-          }`
+          size: ${pageCssSize};
+          margin: ${effective.marginTopMm}mm ${effective.marginRightMm}mm ${effective.marginBottomMm}mm ${effective.marginLeftMm}mm;
+        }`
     : '';
 
   return (
     <>
       <style>{`
-        @media print {
-          @page {
-            size: ${pageCssSize};
-            margin: ${effective.marginTopMm}mm ${effective.marginRightMm}mm ${effective.marginBottomMm}mm ${effective.marginLeftMm}mm;
-          }
-          ${namedPageRule}
+        @page {
+          size: ${pageCssSize};
+          margin: ${effective.marginTopMm}mm ${effective.marginRightMm}mm ${effective.marginBottomMm}mm ${effective.marginLeftMm}mm;
         }
+        ${namedPageRule}
       `}</style>
       <div
         className={`no-print ${
