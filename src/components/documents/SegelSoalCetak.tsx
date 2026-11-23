@@ -67,7 +67,7 @@ export const SegelSoalCetak: React.FC<SegelSoalCetakProps> = ({
   }
 
   return (
-    <div className="w-full flex flex-col items-center">
+    <div className="print-container w-full block print:m-0 print:p-0">
       {activeRooms.flatMap((room) =>
         activeSchedules.map((schedule) => {
           const subject = subjectMap.get(schedule.mapelId);

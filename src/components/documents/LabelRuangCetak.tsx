@@ -47,7 +47,7 @@ export const LabelRuangCetak: React.FC<LabelRuangCetakProps> = ({
   }
 
   return (
-    <div className="w-full flex flex-col items-center">
+    <div className="print-container w-full block print:m-0 print:p-0">
       {activeRooms.map((room) => {
         const roomStudents = students.filter((s) => s.ruangId === room.id && s.status === 'Aktif');
         const classRanges = computeClassRangesInRoom(roomStudents, students);

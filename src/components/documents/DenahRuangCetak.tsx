@@ -90,7 +90,7 @@ export const DenahRuangCetak: React.FC<DenahRuangCetakProps> = ({
   }
 
   return (
-    <div className="w-full flex flex-col items-center">
+    <div className="print-container w-full block print:m-0 print:p-0">
       {sessionList.flatMap((sesi) =>
         activeRooms.map((room) => {
           const roomStudents = students

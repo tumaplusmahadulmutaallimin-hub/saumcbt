@@ -89,7 +89,7 @@ export const RekapKebutuhanCetak: React.FC<RekapKebutuhanCetakProps> = ({
   const sheetStyle = getSheetScreenStyle(paperPreset);
 
   return (
-    <div className="w-full flex flex-col items-center">
+    <div className="print-container w-full block print:m-0 print:p-0">
       {/* Halaman 1: Rekap Perlengkapan Ruang & Kebutuhan Sarpras */}
       <div
         style={sheetStyle}

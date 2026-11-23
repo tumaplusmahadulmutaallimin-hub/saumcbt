@@ -25,7 +25,7 @@ interface PrintToolbarProps {
   showCardDensity?: boolean;
   showKopToggle?: boolean;
   isSticky?: boolean;
-  namedPage?: 'f4_card' | 'schedule';
+  namedPage?: 'f4_card' | 'schedule' | 'denah_lokasi';
 }
 
 export const PrintToolbar: React.FC<PrintToolbarProps> = ({

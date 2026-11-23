@@ -35,7 +35,7 @@ export const TataTertib: React.FC<TataTertibProps> = ({
   }
 
   return (
-    <div className="w-full flex flex-col items-center">
+    <div className="print-container w-full block print:m-0 print:p-0">
       {docsToRender.map((doc) => {
         const effectivePreset: Partial<PaperPreset> = {
           ...paperPreset,

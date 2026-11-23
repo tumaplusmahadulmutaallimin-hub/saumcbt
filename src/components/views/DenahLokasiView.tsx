@@ -137,13 +137,14 @@ export const DenahLokasiView: React.FC<DenahLokasiViewProps> = ({
 
   if (showPrintPreview) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 print:space-y-0">
         <PrintToolbar
           title="Pratinjau Cetak Denah Lokasi Ruang Ujian"
           onBack={() => setShowPrintPreview(false)}
           layout={layout}
           onLayoutChange={setLayout}
           onSaveLayout={onSavePreset}
+          namedPage="denah_lokasi"
         />
         <div className="overflow-x-auto pb-8 print:overflow-visible print:pb-0">
           <DenahLokasiCetak

@@ -55,7 +55,7 @@ export const HpDocumentsCetak: React.FC<HpDocumentsCetakProps> = ({
   const isBlankSheet = manualBlankPrint && docSubtype !== 'hp_rekap';
 
   return (
-    <div className="w-full flex flex-col items-center">
+    <div className="print-container w-full block print:m-0 print:p-0">
       <div
         style={sheetStyle}
         className="saum-sheet border border-slate-300 shadow-sm print-page-break mb-8 print:mb-0"

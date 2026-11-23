@@ -148,7 +148,7 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
     }
 
     return (
-      <div className="print-container w-full flex flex-col items-center print:block print:m-0 print:p-0">
+      <div className="print-container w-full block print:m-0 print:p-0">
         {pages.map((pagePairs, pageIdx) => (
           <div
             key={pageIdx}
@@ -265,7 +265,7 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
     }
 
     return (
-      <div className="print-container w-full flex flex-col items-center print:block print:m-0 print:p-0">
+      <div className="print-container w-full block print:m-0 print:p-0">
         {pages.map((pageStudents, pageIdx) => (
           <div
             key={pageIdx}
@@ -332,7 +332,7 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
   // 3. FORMAT DAFTAR NOMOR MEJA PER RUANG
   if (printStyle === 'daftar_meja') {
     return (
-      <div className="w-full flex flex-col items-center">
+      <div className="print-container w-full block print:m-0 print:p-0">
         <div style={sheetStyle} className="saum-sheet border border-slate-300 shadow-sm">
           {(metrics.resolved.showKop ?? true) && <KopSurat profile={profile} isCompact />}
           <div className="text-center my-3">
@@ -432,7 +432,7 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
   }
 
   return (
-    <div className="print-container w-full flex flex-col items-center print:block print:m-0 print:p-0">
+    <div className="print-container w-full block print:m-0 print:p-0">
       {pages.map((pageStudents, pageIdx) => (
         <div
           key={pageIdx}
@@ -491,7 +491,7 @@ export const NomorMejaCetak: React.FC<NomorMejaCetakProps> = ({
                           {isOnline || st.sesi ? ` / Sesi ${st.sesi || 1}` : ''}
                         </span>
                       </p>
-                      <p className="text-[8.5px] font-mono text-slate-900 bg-emerald-50 print:bg-slate-100 border border-emerald-200 print:border-slate-300 rounded px-1.5 py-0.5 truncate">
+                      <p className="text-[8.5px] font-mono text-slate-900 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 truncate">
                         User: <b>{st.usernameUjian || '-'}</b> &bull; Pass: <b>{st.passwordUjian || '-'}</b>
                       </p>
                       {effectiveLink && (

@@ -27,7 +27,7 @@ export const SKPanitia: React.FC<SKPanitiaProps> = ({
   // 1. SURAT KEPUTUSAN (SK) PANITIA
   if (selectedType === 'sk_panitia') {
     return (
-      <div className="w-full flex flex-col items-center">
+      <div className="print-container w-full block print:m-0 print:p-0">
         <div
           style={sheetStyle}
           className="saum-sheet border border-slate-300 shadow-sm print-page-break mb-8 print:mb-0 text-[11px] leading-relaxed"
@@ -154,7 +154,7 @@ export const SKPanitia: React.FC<SKPanitiaProps> = ({
 
   // 2. SURAT TUGAS PENGAWAS RUANG
   return (
-    <div className="w-full flex flex-col items-center">
+    <div className="print-container w-full block print:m-0 print:p-0">
       <div
         style={sheetStyle}
         className="saum-sheet border border-slate-300 shadow-sm print-page-break mb-8 print:mb-0 text-[11px] leading-relaxed"

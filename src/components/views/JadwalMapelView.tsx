@@ -283,7 +283,7 @@ export const JadwalMapelView: React.FC<JadwalMapelViewProps> = ({
 
   if (showPrint) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 print:space-y-0">
         <PrintToolbar
           title={
             jadwalPrintVersion === 'lengkap'

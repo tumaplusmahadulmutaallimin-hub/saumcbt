@@ -78,7 +78,7 @@ export const KartuPeserta: React.FC<KartuPesertaProps> = ({
   const sheetStyle = getSheetScreenStyle(metrics.resolved);
 
   return (
-    <div className="print-container w-full flex flex-col items-center print:block print:m-0 print:p-0">
+    <div className="print-container w-full block print:m-0 print:p-0">
       {pages.map((pageStudents, pageIdx) => (
         <div
           key={pageIdx}
@@ -100,7 +100,7 @@ export const KartuPeserta: React.FC<KartuPesertaProps> = ({
                   data-testid="kartu-peserta-card"
                   className={`h-full w-full min-h-0 border-2 border-emerald-800 rounded-lg ${
                     isDense6 ? 'p-2' : 'p-3'
-                  } flex flex-col justify-between bg-white relative print:border-emerald-900 print-avoid-break overflow-hidden`}
+                  } flex flex-col justify-between bg-white relative print-avoid-break overflow-hidden`}
                 >
                   <div className="absolute top-1 left-1 w-1.5 h-1.5 border-t-2 border-l-2 border-emerald-800" />
                   <div className="absolute top-1 right-1 w-1.5 h-1.5 border-t-2 border-r-2 border-emerald-800" />
@@ -109,7 +109,7 @@ export const KartuPeserta: React.FC<KartuPesertaProps> = ({
 
                   <div>
                     <KopSurat profile={profile} isCompact={true} />
-                    <div className="flex items-center justify-between border-y border-emerald-800 px-2 py-0.5 bg-emerald-50 print:bg-slate-100 my-1">
+                    <div className="flex items-center justify-between border-y border-emerald-800 px-2 py-0.5 bg-emerald-50 my-1">
                       <div className="text-left min-w-0">
                         <h2
                           className={`${
@@ -212,7 +212,7 @@ export const KartuPeserta: React.FC<KartuPesertaProps> = ({
                             {isOnline || st.sesi ? ` (Sesi ${st.sesi || 1})` : ''}
                           </span>
                         </div>
-                        <div className="flex items-center bg-emerald-50/90 print:bg-slate-100 border border-emerald-200 print:border-slate-400 rounded px-1.5 py-0.5 mt-0.5">
+                        <div className="flex items-center bg-emerald-50/90 border border-emerald-200 rounded px-1.5 py-0.5 mt-0.5">
                           <span className="font-bold text-emerald-950 shrink-0 mr-1">Login:</span>
                           <span className="font-mono font-bold text-slate-900 truncate text-[8px]">
                             User: {st.usernameUjian || '-'} &bull; Pass: {st.passwordUjian || '-'}

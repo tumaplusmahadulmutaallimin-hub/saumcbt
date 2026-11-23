@@ -346,7 +346,7 @@ export const RekapView: React.FC<RekapViewProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print:space-y-0">
       {/* Header Bar */}
       <div className="no-print bg-white p-5 rounded-xl border border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
@@ -986,7 +986,7 @@ export const RekapView: React.FC<RekapViewProps> = ({
 
       {/* TAB 3: CETAK LAPORAN REKAP */}
       {activeTab === 'cetak' && (
-        <div className="space-y-4">
+        <div className="space-y-4 print:space-y-0">
           <PrintToolbar
             title="Cetak Rekap Perlengkapan & Kebutuhan Penggandaan"
             onBack={() => setActiveTab('perlengkapan')}

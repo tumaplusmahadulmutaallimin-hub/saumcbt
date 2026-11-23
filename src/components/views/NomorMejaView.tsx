@@ -327,7 +327,7 @@ export const NomorMejaView: React.FC<NomorMejaViewProps> = ({
       </div>
 
       {/* Inline Layout Sebelum Cetak + Full Live Sheet Preview */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4 print:p-0 print:border-none print:bg-transparent print:rounded-none print:space-y-0">
+      <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4 print:p-0 print:border-none print:bg-transparent print:rounded-none print:shadow-none print:space-y-0">
         <div className="no-print flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200">
           <div>
             <h3 className="text-sm font-bold text-slate-900">
@@ -345,14 +345,14 @@ export const NomorMejaView: React.FC<NomorMejaViewProps> = ({
           layout={layout}
           onLayoutChange={setLayout}
           onSaveLayout={onSavePreset}
-          namedPage="f4_card"
+          namedPage={printStyle === 'daftar_meja' ? undefined : 'f4_card'}
           defaultOpenLayout={true}
           showCardDensity={printStyle === 'label_lengkap' || printStyle === 'kartu_angka_besar'}
           showKopToggle={printStyle === 'daftar_meja'}
           isSticky={false}
         />
 
-        <div className="overflow-x-auto bg-slate-50 p-4 rounded-lg border border-slate-200 print:overflow-visible print:p-0 print:bg-transparent print:border-none">
+        <div className="overflow-x-auto bg-slate-50 p-4 rounded-lg border border-slate-200 print:overflow-visible print:p-0 print:bg-transparent print:border-none print:rounded-none">
           <NomorMejaCetak
             profile={profile}
             examConfig={examConfig}

@@ -9,9 +9,12 @@ import {
   normalizeTargetPaperPreset,
 } from './printLayout';
 import { buildSchedulePrintModel } from './schedulePrint';
+import fs from 'node:fs';
+import path from 'node:path';
 import { KartuPeserta } from '../components/documents/KartuPeserta';
 import { NomorMejaCetak } from '../components/documents/NomorMejaCetak';
 import { JadwalUjianCetak } from '../components/documents/JadwalUjianCetak';
+import { DenahLokasiCetak } from '../components/documents/DenahLokasiCetak';
 import {
   ExamConfig,
   ExamRoom,
@@ -404,3 +407,106 @@ test('JadwalUjian: rowSpan merging preserves order & relations, Versi 1 shows su
   assert.equal(htmlSiswa.includes('Budi Santoso'), false);
   assert.equal(htmlSiswa.includes('Dewi Lestari'), false);
 });
+
+test('Print layout CSS and App shell preserve 1:1 screen-to-print typography, scaling, pagination, and flex-footer anchoring', () => {
+  const indexCss = fs.readFileSync(path.resolve(process.cwd(), 'src/index.css'), 'utf8');
+  const appTsx = fs.readFileSync(path.resolve(process.cwd(), 'src/App.tsx'), 'utf8');
+
+  // Root font-size must not be overridden to 10.5pt inside @media print
+  assert.equal(indexCss.includes('font-size: 10.5pt;'), false);
+  // Base .saum-sheet applies --saum-scale so screen preview matches print scalePercent 1:1
+  assert.ok(indexCss.includes('zoom: var(--saum-scale, 1);'));
+  // Named page rule for A4 landscape Denah Lokasi
+  assert.ok(indexCss.includes('@page denah_lokasi'));
+  assert.ok(indexCss.includes('size: A4 landscape;'));
+  assert.ok(indexCss.includes('.saum-sheet.denah-lokasi-print'));
+  // .print-container uses block flow in print so Chromium break-after/pagination behaves reliably
+  assert.ok(indexCss.includes('.print-container {'));
+  assert.ok(indexCss.includes('display: block !important;'));
+  // Full-sheet flex-col justify-between pages retain printable height in print so footers stay anchored
+  assert.ok(indexCss.includes('.saum-sheet.flex.flex-col.justify-between'));
+  // Schedule print sheet allows overflow-visible and preserves printable height in print
+  assert.ok(indexCss.includes('.saum-sheet.schedule-print'));
+  assert.ok(indexCss.includes('overflow: visible !important;'));
+
+  // App outer shell switches from flex/min-h-screen to block in print
+  assert.ok(appTsx.includes('print:block print:min-h-0'));
+  assert.ok(appTsx.includes('lg:pl-[248px] print:pl-0 flex flex-col print:block'));
+});
+
+test('Printable documents use block print-container and preserve screen colors without slate print overrides', () => {
+  const students = makeStudents(4);
+  const kartuHtml = renderToStaticMarkup(
+    React.createElement(KartuPeserta, {
+      profile: mockProfile,
+      examConfig: mockExamConfig,
+      students,
+      rooms: mockRooms,
+      numberingConfig: mockNumbering,
+    })
+  );
+  assert.ok(kartuHtml.includes('print-container w-full block'));
+  assert.equal(kartuHtml.includes('print:bg-slate-100'), false);
+  assert.equal(kartuHtml.includes('print:border-slate-400'), false);
+  assert.equal(kartuHtml.includes('print:border-slate-300'), false);
+
+  const mejaHtml = renderToStaticMarkup(
+    React.createElement(NomorMejaCetak, {
+      profile: mockProfile,
+      examConfig: mockExamConfig,
+      students,
+      rooms: mockRooms,
+      numberingConfig: mockNumbering,
+      printStyle: 'label_lengkap',
+    })
+  );
+  assert.ok(mejaHtml.includes('print-container w-full block'));
+  assert.equal(mejaHtml.includes('print:bg-slate-100'), false);
+  assert.equal(mejaHtml.includes('print:border-slate-400'), false);
+  assert.equal(mejaHtml.includes('print:border-slate-300'), false);
+
+  const denahLokasiHtml = renderToStaticMarkup(
+    React.createElement(DenahLokasiCetak, {
+      profile: mockProfile,
+      examConfig: mockExamConfig,
+      physicalClassrooms: [
+        { id: 'pc-1', namaKelas: 'KELAS X-A', row: 0, col: 0, assignedRoomIds: ['r-1'] },
+      ],
+      rooms: mockRooms,
+      students,
+    })
+  );
+  assert.ok(denahLokasiHtml.includes('print-container w-full block'));
+  assert.ok(denahLokasiHtml.includes('denah-lokasi-print'));
+
+  const jadwalHtml = renderToStaticMarkup(
+    React.createElement(JadwalUjianCetak, {
+      profile: mockProfile,
+      examConfig: mockExamConfig,
+      schedules: [
+        {
+          id: 'sc-test-1',
+          mapelId: 'sb-test-1',
+          mapelPerKelas: { 'X-A': 'sb-test-1', 'XI-A': 'sb-test-1' },
+          tanggal: '2026-05-11',
+          hari: 'Senin',
+          jamKe: 1,
+          sesi: 1,
+          waktuMulai: '07:30',
+          waktuSelesai: '09:00',
+          ruangIds: ['r-1'],
+        },
+      ],
+      subjects: [
+        { id: 'sb-test-1', kode: 'MTK', nama: 'Matematika', kategori: 'Umum', durasiMenit: 90 },
+      ],
+      rooms: mockRooms,
+      supervisors: [],
+      supervisorAssignments: [],
+      version: 'lengkap',
+    })
+  );
+  assert.ok(jadwalHtml.includes('print-container w-full block'));
+  assert.ok(jadwalHtml.includes('schedule-print'));
+});
+

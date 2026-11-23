@@ -221,7 +221,7 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
   ].includes(selectedDoc);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 print:space-y-0">
       {/* Document Selector Panel */}
       <div className="no-print bg-white p-5 rounded-xl border border-slate-200 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -455,10 +455,12 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
         onLayoutChange={setLayout}
         onSaveLayout={onSavePreset}
         namedPage={
-          selectedDoc === 'kartu_peserta' || selectedDoc === 'label_meja'
+          selectedDoc === 'kartu_peserta' || (selectedDoc === 'label_meja' && nomorMejaStyle !== 'daftar_meja')
             ? 'f4_card'
             : selectedDoc === 'jadwal_ujian'
             ? 'schedule'
+            : selectedDoc === 'denah_lokasi'
+            ? 'denah_lokasi'
             : undefined
         }
         showCardDensity={
@@ -719,12 +721,12 @@ export const CetakDokumenView: React.FC<CetakDokumenViewProps> = ({
         )}
 
         {selectedDoc === 'bundle_semua' && (
-          <div className="bundle-print space-y-8 flex flex-col items-center print:block print:space-y-0">
+          <div className="bundle-print space-y-8 block print:space-y-0">
             <DnpuCetak profile={profile} examConfig={examConfig} students={filteredStudents} rooms={rooms} numberingConfig={numberingConfig} mode="dnpu" paperPreset={layout} />
-            <DenahLokasiCetak profile={profile} examConfig={examConfig} physicalClassrooms={physicalClassrooms} rooms={rooms} students={filteredStudents} supervisors={supervisors} paperPreset={layout} />
+            <DenahLokasiCetak profile={profile} examConfig={examConfig} physicalClassrooms={physicalClassrooms} rooms={rooms} students={filteredStudents} supervisors={supervisors} paperPreset={{ ...layout, orientation: 'landscape' }} />
             <DenahRuangCetak profile={profile} examConfig={examConfig} rooms={rooms} students={filteredStudents} supervisors={supervisors} paperPreset={layout} />
             <LabelRuangCetak profile={profile} examConfig={examConfig} rooms={rooms} students={filteredStudents} physicalClassrooms={physicalClassrooms} paperPreset={layout} />
-            <JadwalUjianCetak profile={profile} examConfig={examConfig} schedules={schedules} subjects={subjects} rooms={rooms} supervisors={supervisors} supervisorAssignments={supervisorAssignments} paperPreset={layout} />
+            <JadwalUjianCetak profile={profile} examConfig={examConfig} schedules={schedules} subjects={subjects} rooms={rooms} supervisors={supervisors} supervisorAssignments={supervisorAssignments} paperPreset={normalizeTargetPaperPreset('jadwal_ujian', layout)} />
             <DaftarHadir profile={profile} examConfig={examConfig} students={filteredStudents} rooms={rooms} schedules={schedules.slice(0, 1)} subjects={subjects} supervisors={supervisors} supervisorAssignments={supervisorAssignments} numberingConfig={numberingConfig} paperPreset={layout} />
             <BeritaAcara profile={profile} examConfig={examConfig} students={filteredStudents} rooms={rooms} schedules={schedules.slice(0, 1)} subjects={subjects} supervisors={supervisors} supervisorAssignments={supervisorAssignments} paperPreset={layout} />
             <RekapKebutuhanCetak profile={profile} examConfig={examConfig} students={filteredStudents} rooms={rooms} schedules={schedules} subjects={subjects} rekapConfig={rekapConfig} paperPreset={layout} />

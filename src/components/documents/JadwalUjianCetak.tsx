@@ -85,7 +85,7 @@ export const JadwalUjianCetak: React.FC<JadwalUjianCetakProps> = ({
   const hasRoomSupervisorData = rows.some((r) => r.roomSupervisors.length > 0);
 
   return (
-    <div className="print-container w-full flex flex-col items-center print:block print:m-0 print:p-0">
+    <div className="print-container w-full block print:m-0 print:p-0">
       <div
         style={sheetStyle}
         data-testid="jadwal-ujian-page"

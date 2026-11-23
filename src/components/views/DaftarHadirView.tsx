@@ -59,7 +59,7 @@ export const DaftarHadirView: React.FC<DaftarHadirViewProps> = ({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 print:space-y-0">
       <div className="no-print bg-white p-4 rounded-xl border border-slate-200 flex flex-wrap items-center gap-3 text-xs">
         <div className="flex items-center gap-1.5">
           <span className="font-semibold text-slate-700">Ruang Ujian:</span>

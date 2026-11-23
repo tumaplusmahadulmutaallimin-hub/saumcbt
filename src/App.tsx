@@ -287,7 +287,7 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex print:block print:min-h-0 print:bg-white">
       {/* Desktop Left Sidebar */}
       <aside className="no-print hidden lg:flex lg:w-[248px] lg:flex-col lg:fixed lg:inset-y-0 lg:left-0 z-40">
         {renderSidebarContent()}
@@ -302,7 +302,7 @@ export default function App() {
       )}
 
       {/* Main Content Shell */}
-      <div className="flex-1 lg:pl-[248px] print:pl-0 flex flex-col min-w-0">
+      <div className="flex-1 lg:pl-[248px] print:pl-0 flex flex-col print:block min-w-0">
         {/* Top Sticky Header */}
         <header className="no-print sticky top-0 z-30 h-14 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">

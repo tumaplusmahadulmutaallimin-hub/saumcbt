@@ -120,10 +120,10 @@ export const DenahLokasiCetak: React.FC<DenahLokasiCetakProps> = ({
   };
 
   return (
-    <div className="w-full flex flex-col items-center overflow-x-auto">
+    <div className="print-container w-full block print:m-0 print:p-0">
       <div
         style={sheetStyle}
-        className="saum-sheet border border-slate-300 shadow-sm print-page-break"
+        className="saum-sheet denah-lokasi-print border border-slate-300 shadow-sm print-page-break mb-8 print:mb-0"
       >
         {(paperPreset?.showKop ?? true) && <KopSurat profile={profile} isCompact />}
 

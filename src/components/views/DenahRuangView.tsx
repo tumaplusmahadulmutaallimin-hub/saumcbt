@@ -210,7 +210,7 @@ export const DenahRuangView: React.FC<DenahRuangViewProps> = ({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 print:space-y-0">
       <div className="no-print bg-white p-5 rounded-xl border border-slate-200 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -399,7 +399,7 @@ export const DenahRuangView: React.FC<DenahRuangViewProps> = ({
           onSaveRooms={onSaveRooms}
         />
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-6 print:space-y-0">
           <div className="overflow-x-auto pb-4 print:overflow-visible print:pb-0">
             <DenahRuangCetak
               profile={profile}

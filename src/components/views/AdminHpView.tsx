@@ -660,7 +660,7 @@ export const AdminHpView: React.FC<AdminHpViewProps> = ({
 
   if (showPrint) {
     return (
-      <div>
+      <div className="print:space-y-0">
         <PrintToolbar
           title="Cetak Administrasi HP Santri (Form Manual)"
           onBack={() => setShowPrint(false)}

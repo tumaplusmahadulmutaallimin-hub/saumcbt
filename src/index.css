@@ -22,6 +22,7 @@
   padding: var(--saum-pt, 10mm) var(--saum-pr, 10mm) var(--saum-pb, 10mm) var(--saum-pl, 10mm);
   margin-left: auto;
   margin-right: auto;
+  zoom: var(--saum-scale, 1);
 }
 
 .saum-sheet.print-page {
@@ -35,6 +36,8 @@
 .print-grid-2x3 {
   width: 100%;
   height: 100%;
+  flex: 1 1 0%;
+  min-height: 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(3, minmax(0, 1fr));
@@ -45,6 +48,8 @@
 .print-grid-2x2 {
   width: 100%;
   height: 100%;
+  flex: 1 1 0%;
+  min-height: 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
@@ -55,6 +60,8 @@
 .print-grid-1x6 {
   width: 100%;
   height: 100%;
+  flex: 1 1 0%;
+  min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: repeat(6, minmax(0, 1fr));
@@ -92,6 +99,11 @@
   margin: 15mm;
 }
 
+@page denah_lokasi {
+  size: A4 landscape;
+  margin: 8mm 10mm;
+}
+
 @media print {
   @page {
     size: A4 portrait;
@@ -106,8 +118,6 @@
     margin: 0 !important;
     padding: 0 !important;
     background: white !important;
-    color: black !important;
-    font-size: 10.5pt;
     overflow: visible !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
@@ -129,20 +139,30 @@
 
   .print-container {
     display: block !important;
+    width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
   }
 
   .saum-sheet {
-    width: 100% !important;
+    width: var(--saum-printable-w, 100%) !important;
     max-width: 100% !important;
     min-height: 0 !important;
     padding: 0 !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
     border: none !important;
     box-shadow: none !important;
     border-radius: 0 !important;
     zoom: var(--saum-scale, 1);
+  }
+
+  /* Anchor footers/signatures to page bottom on full-sheet flex layouts matching screen preview */
+  .saum-sheet.flex.flex-col.justify-between {
+    min-height: calc(var(--saum-printable-h, 277mm) - 1mm) !important;
+  }
+
+  .saum-sheet.denah-lokasi-print {
+    page: denah_lokasi;
   }
 
   .saum-sheet.print-page {
@@ -169,19 +189,19 @@
   .saum-sheet.schedule-print {
     page: schedule;
     width: var(--saum-printable-w, 300mm) !important;
-    height: calc(var(--saum-printable-h, 180mm) - 0.5mm) !important;
-    min-height: 0 !important;
-    max-height: calc(var(--saum-printable-h, 180mm) - 0.5mm) !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: calc(var(--saum-printable-h, 180mm) - 1mm) !important;
+    max-height: none !important;
     padding: 0 !important;
     margin: 0 auto !important;
-    overflow: hidden !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
+    overflow: visible !important;
     page-break-after: auto !important;
     break-after: auto !important;
   }
 
-  .bundle-print .saum-sheet.schedule-print {
+  .bundle-print .saum-sheet.schedule-print,
+  .bundle-print .print-container:not(:last-child) .saum-sheet:last-child {
     page-break-after: always !important;
     break-after: page !important;
   }
@@ -201,6 +221,16 @@
     break-inside: avoid !important;
   }
 
+  thead {
+    display: table-header-group;
+  }
+
+  tr,
+  img {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
@@ -210,6 +240,12 @@
 @media screen {
   .print-only {
     display: none;
+  }
+
+  /* Keep paper border outside content box so screen inner width/height match print 1:1 */
+  .saum-sheet {
+    border-width: 0 !important;
+    box-shadow: 0 0 0 1px #cbd5e1, 0 1px 3px 0 rgb(15 23 42 / 0.08) !important;
   }
 }
 

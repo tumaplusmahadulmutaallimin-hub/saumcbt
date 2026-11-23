@@ -218,7 +218,7 @@ export const DokumenUjianView: React.FC<DokumenUjianViewProps> = ({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print:space-y-0">
       <div className="no-print bg-white p-5 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-base font-bold text-slate-900">Dokumen Pelaksanaan Ujian</h2>
@@ -268,7 +268,7 @@ export const DokumenUjianView: React.FC<DokumenUjianViewProps> = ({
       )}
 
       {subTab === 'segel' && (
-        <div className="space-y-5">
+        <div className="space-y-5 print:space-y-0">
           {examConfig.moda === 'online' && (
             <div className="no-print bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-lg text-xs font-semibold flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
@@ -398,7 +398,7 @@ export const DokumenUjianView: React.FC<DokumenUjianViewProps> = ({
       )}
 
       {subTab === 'berita_acara' && (
-        <div className="space-y-5">
+        <div className="space-y-5 print:space-y-0">
           <div className="no-print bg-white p-4 rounded-xl border border-slate-200 flex flex-wrap gap-3 text-xs">
             <select
               value={selectedRoomId}
@@ -453,7 +453,7 @@ export const DokumenUjianView: React.FC<DokumenUjianViewProps> = ({
       )}
 
       {subTab === 'tata_tertib' && currentTatib && (
-        <div className="space-y-5">
+        <div className="space-y-5 print:space-y-0">
           <div className="no-print bg-white p-5 rounded-xl border border-slate-200 space-y-4 text-xs">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex gap-2">
